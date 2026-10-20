@@ -1,0 +1,19 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Robot Framework & Execution Outputs
+output/
+*.log
+*.png
+
+# Virtual Environments & RCC
+.venv/
+venv/
+env/
+.robocorp/
+
+# OS & Editor files
+.DS_Store
+Thumbs.db

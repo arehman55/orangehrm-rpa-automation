@@ -1,0 +1,14 @@
+tasks:
+  Run OrangeHRM Enterprise Automation:
+    shell: python -m robot --report NONE --outputdir output --logtitle "OrangeHRM Automation Log" tasks.robot
+
+artifactsDir: output
+
+PATH:
+  - .
+PYTHONPATH:
+  - .
+  - src
+
+ignoreFiles:
+  - .gitignore
