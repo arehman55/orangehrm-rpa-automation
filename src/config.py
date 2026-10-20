@@ -120,3 +120,15 @@ MY_INFO_SECTIONS_DATA = {
         "renewal_date": "2027-01-01",
     },
 }
+
+# ==============================================================================
+# PHASE 4: THUNDERBIRD EMAIL AUTOMATION CONFIGURATION
+# ==============================================================================
+TEAM_LEAD_EMAIL = "fa22-bcs-260@students.cuisahiwal.edu.pk"
+EMAIL_1_SUBJECT = "OrangeHRM RPA Report: Weekly Timesheet Automation Summary"
+
+# Standard Windows installation paths for Mozilla Thunderbird
+THUNDERBIRD_PATHS = [
+    Path(r"C:\Program Files\Mozilla Thunderbird\thunderbird.exe"),
+    Path(r"C:\Program Files (x86)\Mozilla Thunderbird\thunderbird.exe"),
+]

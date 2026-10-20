@@ -1,19 +1,14 @@
 *** Settings ***
-Documentation       Enterprise RPA & Web Scraping Suite for OrangeHRM Demo Portal.
-...                 Automates Phase 1 (Authentication), Phase 2 (Time Module 7-Day Timesheet),
-...                 and Phase 3 (My Info 10 Sections + Attachments) using strict Explicit Waits.
-Library             src.keywords.orangehrm_keywords.OrangeHRMKeywords
-Suite Teardown      Close Browser Safely
-
-
-*** Variables ***
-${HEADLESS_MODE}    ${False}
-
+Documentation     Enterprise RPA & Web Scraping Suite for OrangeHRM Demo Portal.
+...               Automates Login, 7-Day Timesheets, 10 My Info Sections, Excel Reporting,
+...               and Thunderbird HTML Email Dispatch.
+Library           src.keywords.orangehrm_keywords.OrangeHRMKeywords
+Suite Teardown    Close Browser Safely
 
 *** Tasks ***
 Run OrangeHRM Enterprise Automation
-    [Documentation]    Executes the complete 3-phase automation and multi-workbook Excel export pipeline.
-    Initialize Browser Session    headless=${HEADLESS_MODE}
+    [Documentation]    Executes the complete 4-phase OrangeHRM RPA and Thunderbird Email workflow.
+    Initialize Browser Session    headless=${False}
 
     Log To Console    \n[Phase 1] Authenticating with OrangeHRM Portal...
     Execute Phase 1 Authentication
@@ -24,4 +19,22 @@ Run OrangeHRM Enterprise Automation
     Log To Console    [Phase 3] Automating and Scraping all 10 'My Info' Sections & Attachments...
     Execute Phase 3 My Info Automation And Scraping
 
-    Log To Console    \n[Success] All Excel artifacts generated in 'output/' folder!
+    Log To Console    [Phase 4] Sending HTML Tabular Reports & Excel Attachments via Thunderbird...
+    Execute Phase 4 Email Reporting Via Thunderbird
+
+    Log To Console    [Success] All 4 Phases completed and emails dispatched via Thunderbird!
+
+
+
+#            /////// Testing Only: Thunderbird Email Automation ///////
+
+# *** Settings ***
+# Documentation     Temporary test for Thunderbird Email Automation.
+# Library           src.keywords.orangehrm_keywords.OrangeHRMKeywords
+
+# *** Tasks ***
+# Test Thunderbird Email Only
+#     [Documentation]    Directly executes Phase 4 email reporting using existing Excel files.
+#     Log To Console    \n[Test Mode] Running Thunderbird Email Automation Only...
+#     Execute Phase 4 Email Reporting Via Thunderbird
+#     Log To Console    [Success] Email test completed!
