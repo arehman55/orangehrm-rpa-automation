@@ -1,16 +1,18 @@
 """
 Phase 4: Mozilla Thunderbird Desktop Email Automation Page Object Model.
-Uses Pure Python, RPA.Windows with Sema4.ai inspected locators, explicit waits,
-and simple professional black-and-white HTML tabular formatting.
+Uses Pure Python, cross-platform RPA.Desktop (keyboard shortcuts), 
+CLI compose commands, and OS detection for Windows & Ubuntu compatibility.
 """
 
 import logging
 import subprocess
 import tempfile
+import platform
+from time import sleep
 from pathlib import Path
 from typing import List, Dict, Any
 import pandas as pd
-from RPA.Windows import Windows
+from RPA.Desktop import Desktop
 from src.config import TEAM_LEAD_EMAIL, EMAIL_1_SUBJECT, THUNDERBIRD_PATHS
 from src.exceptions import EmailAutomationError
 
@@ -18,25 +20,33 @@ logger = logging.getLogger(__name__)
 
 
 class ThunderbirdMailer:
-    """Page Object for automating Mozilla Thunderbird desktop client using Sema4.ai inspected locators."""
+    """Page Object for automating Mozilla Thunderbird using cross-platform CLI and Keyboard shortcuts."""
 
     def __init__(self, timeout: int = 20) -> None:
-        self.win = Windows()
+        self.desktop = Desktop()
         self.timeout = timeout
         self.tb_exe = self._resolve_thunderbird_executable()
 
-    def _resolve_thunderbird_executable(self) -> Path:
-        """Locates the installed Mozilla Thunderbird executable on Windows."""
-        for path in THUNDERBIRD_PATHS:
-            if path.exists():
-                return path
+    def _resolve_thunderbird_executable(self) -> str:
+        """Locates Thunderbird executable based on the operating system (Windows/Linux)."""
+        current_os = platform.system()
+        
+        if current_os == "Linux":
+            # On Ubuntu/Linux, Thunderbird is universally accessible via terminal command
+            return "thunderbird"
+            
+        elif current_os == "Windows":
+            for path in THUNDERBIRD_PATHS:
+                if path.exists():
+                    return str(path)
+                    
         raise EmailAutomationError(
-            f"Mozilla Thunderbird executable not found in standard paths: {THUNDERBIRD_PATHS}"
+            f"Mozilla Thunderbird executable not found for OS: {current_os}"
         )
 
     def send_timesheet_html_email(self, timesheet_excel_path: Path) -> None:
         """
-        Email 1: Reads scraped timesheet Excel, builds clean black-and-white HTML table,
+        Email 1: Reads scraped timesheet Excel, builds HTML table,
         attaches OrangeHRM_Data.xlsx, and sends via Thunderbird.
         """
         if not timesheet_excel_path.exists():
@@ -62,13 +72,13 @@ class ThunderbirdMailer:
         )
 
         logger.info("Launching Thunderbird Compose window for Email 1 (Timesheet)...")
-        self._compose_and_dispatch(compose_arg, expected_title_keyword="Write:")
+        self._compose_and_dispatch(compose_arg)
         logger.info("Email 1 (Timesheet HTML Report) sent successfully!")
 
     def send_reply_with_details_excel(self, details_excel_path: Path) -> None:
         """
-        Email 2: Uses Sema4.ai inspected Sent folder & Reply button locators to reply
-        to Email 1 thread and attach 'Details.xlsx'.
+        Email 2: Dispatches the Details.xlsx as a threaded reply using CLI compose 
+        to ensure cross-platform stability on both Ubuntu and Windows.
         """
         if not details_excel_path.exists():
             raise EmailAutomationError(
@@ -81,94 +91,45 @@ class ThunderbirdMailer:
         temp_reply_html = Path(tempfile.gettempdir()) / "orangehrm_email2_reply.html"
         temp_reply_html.write_text(reply_html, encoding="utf-8")
 
+        # Prepends 'Re:' to thread it visually in the recipient's inbox
         reply_subject = f"Re: {EMAIL_1_SUBJECT}"
         file_uri = details_excel_path.resolve().as_uri()
 
-        # Attempt UI-based Reply using inspected locators; fallback to CLI threaded compose if needed
-        if not self._trigger_inspected_sent_reply(details_excel_path):
-            compose_arg = (
-                f"to='{TEAM_LEAD_EMAIL}',"
-                f"subject='{reply_subject}',"
-                f"format='html',"
-                f"message='{temp_reply_html.resolve()}',"
-                f"attachment='{file_uri}'"
-            )
-            self._compose_and_dispatch(compose_arg, expected_title_keyword="Write:")
-
+        compose_arg = (
+            f"to='{TEAM_LEAD_EMAIL}',"
+            f"subject='{reply_subject}',"
+            f"format='html',"
+            f"message='{temp_reply_html.resolve()}',"
+            f"attachment='{file_uri}'"
+        )
+        
+        logger.info("Launching Thunderbird Compose window for Email 2 (Reply)...")
+        self._compose_and_dispatch(compose_arg)
         logger.info("Email 2 (Reply with Details.xlsx) sent successfully!")
 
-    def _trigger_inspected_sent_reply(self, attachment_path: Path) -> bool:
+    def _compose_and_dispatch(self, compose_arg: str) -> None:
         """
-        Uses Sema4.ai inspected locators for Sent folder and Reply button.
+        Executes `thunderbird -compose` cross-platform, waits for UI to render, 
+        and uses universal Ctrl+Enter shortcut to dispatch.
         """
         try:
-            subprocess.Popen([str(self.tb_exe)])
+            # 1. Trigger the Compose window via OS terminal
+            subprocess.Popen([self.tb_exe, "-compose", compose_arg])
+
+            # 2. Wait for the Compose UI to render (Cross-platform explicit wait)
+            sleep(5)
+
+            # 3. Dispatch using Universal Keyboard Shortcut (Ctrl + Enter)
+            logger.info("Dispatching email via Ctrl+Enter shortcut...")
+            self.desktop.press_keys("ctrl", "enter")
             
-            # 1. Focus Main Thunderbird Window (Inspected window title)
-            self.win.control_window(
-                "regex:.*Sent - abdulrehmanlhr55@gmail.com - Mozilla Thunderbird",
-                timeout=10
-            )
-
-            # 2. Select Sent Folder using inspected automationid
-            sent_folder_locator = 'automationid:"allaW1hcDovL2FiZHVscmVobWFubGhyNTUlNDBnbWFpbC5jb21AaW1hcC5nbWFpbC5jb21/W0dtYWlsXS9TZW50IE1haWw="'
-            self.win.click(sent_folder_locator)
-
-            # 3. Select the sent email in the list and click Inspected Reply Button ('hdrReplyButton')
-            first_msg_locator = f"regex:.*{EMAIL_1_SUBJECT}.*"
-            self.win.click(first_msg_locator)
-
-            reply_btn_locator = 'automationid:"hdrReplyButton"'
-            self.win.click(reply_btn_locator)
-
-            # 4. Wait for Reply Write window and dispatch
-            self.win.control_window("regex:.*Re:.*", timeout=8)
-            logger.info("Dispatching Email 2 reply via Ctrl+Enter...")
-            self.win.send_keys(keys="{Ctrl}{Enter}")
-            self._wait_for_compose_window_to_close()
-            return True
-        except Exception as exc:
-            logger.warning("Inspected UI reply flow skipped, falling back to CLI compose: %s", exc)
-            return False
-
-    def _compose_and_dispatch(self, compose_arg: str, expected_title_keyword: str) -> None:
-        """
-        Executes `thunderbird.exe -compose`, uses inspected 'button-send' locator to dispatch.
-        """
-        try:
-            subprocess.Popen([str(self.tb_exe), "-compose", compose_arg])
-
-            # Wait for Compose window using inspected title pattern
-            compose_locator = f"regex:.*{expected_title_keyword}.*"
-            self.win.control_window(compose_locator, timeout=self.timeout)
-
-            # Use Sema4.ai inspected Send button automationid ('button-send')
-            try:
-                send_btn_locator = 'automationid:"button-send"'
-                self.win.click(send_btn_locator, timeout=10)
-            except Exception:
-                # Fallback to shortcut if click fails
-                logger.info("Send button click fallback to Ctrl+Enter...")
-                self.win.send_keys(keys="{Ctrl}{Enter}")
-
-            self._wait_for_compose_window_to_close()
+            # Brief pause to allow Thunderbird to process the send action
+            sleep(2)
 
         except Exception as exc:
             raise EmailAutomationError(
                 f"Failed during Thunderbird email dispatch: {exc}"
             ) from exc
-
-    def _wait_for_compose_window_to_close(self) -> None:
-        """Polls window list until the Compose window disappears."""
-        for _ in range(30):
-            windows_list = self.win.list_windows()
-            write_open = any(
-                "Write:" in w.get("title", "") or "Re:" in w.get("title", "")
-                for w in windows_list
-            )
-            if not write_open:
-                return
-        logger.info("Compose window closed successfully.")
 
     @staticmethod
     def _build_timesheet_html(records: List[Dict[str, Any]]) -> str:
