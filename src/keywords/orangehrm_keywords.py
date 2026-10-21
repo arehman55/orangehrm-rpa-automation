@@ -171,7 +171,7 @@ class OrangeHRMKeywords:
             ) from exc
 
     @keyword("Execute Phase 4 Email Reporting Via Thunderbird")
-    def execute_phase_4_email_reporting_via_thunderbird(self) -> None:
+    def execute_phase_4_email_reporting(self) -> None:
         """
         Executes Phase 4: Dispatches Email 1 (Simple black-and-white HTML table + OrangeHRM_Data.xlsx)
         and Email 2 (Threaded Reply with Details.xlsx) via cross-platform Thunderbird logic.

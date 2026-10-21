@@ -9,7 +9,6 @@ Requires-Dist: selenium>=4.15.0
 Requires-Dist: webdriver-manager>=4.0.0
 Requires-Dist: robotframework>=6.1.0
 Requires-Dist: rpaframework>=28.0.0
-Requires-Dist: rpaframework-windows>=7.3.0
 Requires-Dist: pandas>=2.0.0
 Requires-Dist: openpyxl>=3.1.0
 
