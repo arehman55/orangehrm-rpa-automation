@@ -1,0 +1,2 @@
+[console_scripts]
+run-rpa = src.cli:main
