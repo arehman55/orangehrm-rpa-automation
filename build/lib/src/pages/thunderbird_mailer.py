@@ -109,21 +109,27 @@ class ThunderbirdMailer:
 
     def _compose_and_dispatch(self, compose_arg: str) -> None:
         """
-        Executes `thunderbird -compose` cross-platform, waits for UI to render, 
-        and uses universal Ctrl+Enter shortcut to dispatch.
+        Executes `thunderbird -compose` cross-platform, clears conflicting Linux env vars,
+        waits for UI to render, and uses universal Ctrl+Enter shortcut to dispatch.
         """
+        import os
+        
         try:
-            # 1. Trigger the Compose window via OS terminal
-            subprocess.Popen([self.tb_exe, "-compose", compose_arg])
+            # Clean environment for Linux Ubuntu (Removes Conda/Snap library conflicts)
+            env = os.environ.copy()
+            for key in ["LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONHOME"]:
+                env.pop(key, None)
 
-            # 2. Wait for the Compose UI to render (Cross-platform explicit wait)
+            # 1. Trigger the Compose window via OS terminal with isolated env
+            subprocess.Popen([self.tb_exe, "-compose", compose_arg], env=env)
+
+            # 2. Wait for the Compose UI to render
             sleep(5)
 
             # 3. Dispatch using Universal Keyboard Shortcut (Ctrl + Enter)
             logger.info("Dispatching email via Ctrl+Enter shortcut...")
             self.desktop.press_keys("ctrl", "enter")
             
-            # Brief pause to allow Thunderbird to process the send action
             sleep(2)
 
         except Exception as exc:
