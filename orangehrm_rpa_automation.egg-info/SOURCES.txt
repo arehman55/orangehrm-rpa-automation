@@ -1,3 +1,4 @@
+MANIFEST.in
 README.md
 pyproject.toml
 orangehrm_rpa_automation.egg-info/PKG-INFO
@@ -12,6 +13,8 @@ src/cli.py
 src/config.py
 src/excel_manager.py
 src/exceptions.py
+src/tasks.robot
+src/devdata/sample_attachment.pdf
 src/keywords/__init__.py
 src/keywords/orangehrm_keywords.py
 src/pages/__init__.py

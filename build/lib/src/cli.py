@@ -11,6 +11,9 @@ from pathlib import Path
 from robot import run as robot_run
 from src.keywords.orangehrm_keywords import OrangeHRMKeywords
 
+# Yahan humne config se dynamic paths import kar liye hain
+from src.config import ROBOT_FILE, OUTPUT_DIR
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -20,16 +23,13 @@ logger = logging.getLogger("CentralizedRunner")
 
 def run_robot_suite() -> int:
     """Initiates the complete automation suite via Robot Framework orchestrator."""
-    project_root = Path(__file__).resolve().parent.parent
-    tasks_file = project_root / "tasks.robot"
-    output_dir = project_root / "output"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    logger.info("Initiating Full RPA Suite via Robot Framework (%s)...", tasks_file.name)
+    logger.info("Initiating Full RPA Suite via Robot Framework (%s)...", ROBOT_FILE.name)
+    
+    # FIX: Yahan direct ROBOT_FILE aur OUTPUT_DIR use kiya hai jo config.py se aayega
     return_code = robot_run(
-        str(tasks_file),
-        outputdir=str(output_dir),
-        pythonpath=[str(project_root), str(project_root / "src")],
+        str(ROBOT_FILE),
+        outputdir=str(OUTPUT_DIR),
+        pythonpath=[str(ROBOT_FILE.parent)],
     )
     return int(return_code)
 

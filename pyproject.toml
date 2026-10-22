@@ -27,3 +27,4 @@ run-rpa = "src.cli:main"
 [tool.setuptools]
 # Hum src directory ko package ke taur par register kar rahe hain taake existing imports (src.pages...) break na hon
 packages = ["src", "src.pages", "src.keywords"]
+include-package-data = true

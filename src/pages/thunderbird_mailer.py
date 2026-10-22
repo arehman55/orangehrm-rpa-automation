@@ -6,14 +6,13 @@ CLI compose commands, and OS detection for Windows & Ubuntu compatibility.
 
 import logging
 import subprocess
-import tempfile
 import platform
 from time import sleep
 from pathlib import Path
 from typing import List, Dict, Any
 import pandas as pd
 from RPA.Desktop import Desktop
-from src.config import TEAM_LEAD_EMAIL, EMAIL_1_SUBJECT, THUNDERBIRD_PATHS
+from src.config import TEAM_LEAD_EMAIL, EMAIL_1_SUBJECT, THUNDERBIRD_PATHS, OUTPUT_DIR
 from src.exceptions import EmailAutomationError
 
 logger = logging.getLogger(__name__)
@@ -59,7 +58,9 @@ class ThunderbirdMailer:
         records = df.to_dict(orient="records")
 
         html_body = self._build_timesheet_html(records)
-        temp_html = Path(tempfile.gettempdir()) / "orangehrm_email1_body.html"
+        
+        # FIX: Using OUTPUT_DIR instead of tempfile
+        temp_html = OUTPUT_DIR / "orangehrm_email1_body.html"
         temp_html.write_text(html_body, encoding="utf-8")
 
         file_uri = timesheet_excel_path.resolve().as_uri()
@@ -88,7 +89,8 @@ class ThunderbirdMailer:
         logger.info("Preparing Email 2 (Reply with Details.xlsx attached)...")
         reply_html = self._build_details_reply_html()
 
-        temp_reply_html = Path(tempfile.gettempdir()) / "orangehrm_email2_reply.html"
+        # FIX: Using OUTPUT_DIR instead of tempfile
+        temp_reply_html = OUTPUT_DIR / "orangehrm_email2_reply.html"
         temp_reply_html.write_text(reply_html, encoding="utf-8")
 
         # Prepends 'Re:' to thread it visually in the recipient's inbox
