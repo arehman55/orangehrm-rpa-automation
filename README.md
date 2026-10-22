@@ -2,7 +2,7 @@
 
 This project is an end-to-end Enterprise Robotic Process Automation (RPA) suite built with Python, Robot Framework, Selenium, and RPA.Desktop. It seamlessly automates web scraping, dynamic Excel report generation, and cross-platform desktop email dispatch.
 
-## 🚀 Automation Workflow (The 4 Phases)
+## Automation Workflow (The 4 Phases)
 When initiated, the bot autonomously executes the following 4 phases:
 1. **Phase 1: Secure Authentication:** Automates the login process into the OrangeHRM portal using Selenium.
 2. **Phase 2: Timesheet Data Extraction:** Navigates to the Time module, scrapes employee timesheet records, and structures the data for reporting.
@@ -11,7 +11,7 @@ When initiated, the bot autonomously executes the following 4 phases:
 
 ---
 
-## 🛠️ Prerequisites
+## Prerequisites
 Ensure the following are installed and configured on your system before running the bot:
 1. **Python 3.9+**
 2. **Mozilla Thunderbird** (Logged in with the sender's email account)
@@ -20,7 +20,7 @@ Ensure the following are installed and configured on your system before running 
 
 ---
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 This project is professionally packaged using the `pyproject.toml` (PEP 621) standard. It is designed to be fully portable and self-contained.
 
@@ -44,7 +44,7 @@ pip install orangehrm_rpa_automation-1.0.0-py3-none-any.whl
 
 ---
 
-## ⚙️ Execution (CLI Commands)
+## Execution (CLI Commands)
 
 Once installed, the package registers a global command-line interface (CLI) command `run-rpa`. You can execute this command from **any directory**, and the bot will dynamically create an `output` folder in your current working directory.
 
@@ -60,7 +60,7 @@ run-rpa --mode email-only
 
 ---
 
-## 📂 Project Outputs
+## Project Outputs
 Upon successful execution, the bot generates a dynamic `output/` directory in the terminal's current path containing:
 * `OrangeHRM_Data.xlsx` (Phase 2 Scraped Data)
 * `Details.xlsx` (Phase 3 Comprehensive Employee Data with internal PDF hyperlinks)
