@@ -88,13 +88,36 @@ class BasePage:
     def clear_and_type(self, locator: Tuple[str, str], text: str) -> None:
         """
         Clears a Vue.js bound input field using pure Selenium actions and CTRL+A + BACKSPACE.
+        Dismisses any overlapping calendar popups (oxd-calendar-wrapper) before clicking.
         """
         element = self.find_visible(locator)
+
+        # If an OrangeHRM date-picker calendar popup is open and overlapping, dismiss it via ESCAPE
+        open_calendars = self.driver.find_elements(
+            By.CSS_SELECTOR, "div.oxd-calendar-wrapper"
+        )
+        if open_calendars:
+            ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+
         ActionChains(self.driver).move_to_element(element).perform()
-        element.click()
+        try:
+            element.click()
+        except ElementClickInterceptedException:
+            logger.info(
+                "Click intercepted on input %s (likely by calendar popup). Dismissing popup and clicking via ActionChains.",
+                locator,
+            )
+            ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
+            ActionChains(self.driver).move_to_element(element).click().perform()
+
         element.send_keys(Keys.CONTROL + "a")
         element.send_keys(Keys.BACKSPACE)
         element.send_keys(str(text))
+
+        # Close any calendar dropdown triggered by typing into a date input
+        placeholder = (element.get_attribute("placeholder") or "").lower()
+        if "yyyy" in placeholder or "dd" in placeholder or "mm" in placeholder:
+            element.send_keys(Keys.TAB)
 
     def _safe_xpath_literal(self, text: str) -> str:
         """Safely formats strings containing single quotes for XPath expressions."""

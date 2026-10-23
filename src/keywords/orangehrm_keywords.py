@@ -26,10 +26,12 @@ from src.excel_manager import ExcelManager
 from src.pages.login_page import LoginPage
 from src.pages.time_page import TimePage
 from src.pages.my_info_page import MyInfoPage
+from src.pages.thunderbird_mailer import ThunderbirdMailer
 from src.exceptions import (
     AuthenticationError,
     TimesheetAutomationError,
     MyInfoAutomationError,
+    EmailAutomationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,6 +168,26 @@ class OrangeHRMKeywords:
             self._capture_failure_state("phase3_my_info_failure")
             raise MyInfoAutomationError(
                 f"Phase 3 My Info Module failed: {exc}"
+            ) from exc
+
+    @keyword("Execute Phase 4 Email Reporting Via Thunderbird")
+    def execute_phase_4_email_reporting(self) -> None:
+        """
+        Executes Phase 4: Dispatches Email 1 (Simple black-and-white HTML table + OrangeHRM_Data.xlsx)
+        and Email 2 (Threaded Reply with Details.xlsx) via cross-platform Thunderbird logic.
+        """
+        try:
+            mailer = ThunderbirdMailer()
+            timesheet_excel = OUTPUT_DIR / "OrangeHRM_Data.xlsx"
+            details_excel = OUTPUT_DIR / "Details.xlsx"
+
+            mailer.send_timesheet_html_email(timesheet_excel)
+            mailer.send_reply_with_details_excel(details_excel)
+        except EmailAutomationError:
+            raise
+        except Exception as exc:
+            raise EmailAutomationError(
+                f"Phase 4 Thunderbird Email Reporting failed: {exc}"
             ) from exc
 
     @keyword("Close Browser Safely")

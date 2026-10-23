@@ -6,14 +6,16 @@ Separates test data and environment constants from page logic.
 import os
 from pathlib import Path
 
-# Base Paths
-BASE_DIR = Path(__file__).resolve().parent.parent
-OUTPUT_DIR = BASE_DIR / "output"
+# FIX: Sirf ek dafa .parent likhna hai taake path 'src' ke andar hi rahe
+BASE_DIR = Path(__file__).resolve().parent
+
+# Ab robot file aur devdata sahi jagah point karenge
+ROBOT_FILE = BASE_DIR / "tasks.robot"
 DEVDATA_DIR = BASE_DIR / "devdata"
 
-# Ensure directories exist prior to execution
+# Output folder user ke current terminal mein banega
+OUTPUT_DIR = Path.cwd() / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-DEVDATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Portal Credentials & URLs
 BASE_URL = "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login"
@@ -120,3 +122,15 @@ MY_INFO_SECTIONS_DATA = {
         "renewal_date": "2027-01-01",
     },
 }
+
+# ==============================================================================
+# PHASE 4: THUNDERBIRD EMAIL AUTOMATION CONFIGURATION
+# ==============================================================================
+TEAM_LEAD_EMAIL = "fa22-bcs-260@students.cuisahiwal.edu.pk"
+EMAIL_1_SUBJECT = "OrangeHRM RPA Report: Weekly Timesheet Automation Summary"
+
+# Standard Windows installation paths for Mozilla Thunderbird
+THUNDERBIRD_PATHS = [
+    Path(r"C:\Program Files\Mozilla Thunderbird\thunderbird.exe"),
+    Path(r"C:\Program Files (x86)\Mozilla Thunderbird\thunderbird.exe"),
+]

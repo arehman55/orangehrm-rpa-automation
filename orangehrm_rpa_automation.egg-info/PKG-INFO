@@ -1,0 +1,47 @@
+Metadata-Version: 2.4
+Name: orangehrm-rpa-automation
+Version: 1.0.0
+Summary: Enterprise RPA Automation Suite for OrangeHRM and Mozilla Thunderbird
+Author-email: Abdul Rehman <abdulrehmanlhr55@gmail.com>
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: selenium>=4.15.0
+Requires-Dist: webdriver-manager>=4.0.0
+Requires-Dist: robotframework>=6.1.0
+Requires-Dist: rpaframework>=28.0.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: openpyxl>=3.1.0
+
+# Enterprise RPA Automation Suite: OrangeHRM & Thunderbird
+
+This project is an end-to-end Enterprise Robotic Process Automation (RPA) suite built with Python, Robot Framework, Selenium, and Sema4.ai. It automates web scraping, Excel report generation, and desktop email dispatch seamlessly.
+
+## Automation Workflow (The 4 Phases)
+When initiated, the bot autonomously executes the following 4 phases:
+1. **Phase 1: Secure Authentication:** Automates the login process into the OrangeHRM portal.
+2. **Phase 2: Timesheet Data Extraction:** Navigates to the Time module, scrapes employee timesheet records, and structures the data for reporting.
+3. **Phase 3: Employee Data & Excel Generation:** Navigates to the My Info module, extracts data across 10 different sections, and dynamically generates highly formatted Excel workbooks (`OrangeHRM_Data.xlsx` and `Details.xlsx`).
+4. **Phase 4: Desktop Email Automation:** Utilizes UI locators to take control of Mozilla Thunderbird Desktop. It dispatches the Timesheet data as an HTML table in the primary email, and sends the `Details.xlsx` workbook as a threaded reply.
+
+---
+
+## Prerequisites
+Ensure the following are installed and configured on your system before running the bot:
+1. **Python 3.9+**
+2. **Mozilla Thunderbird** (Logged in with the sender's email account)
+3. **Google Chrome** (For Selenium web automation)
+4. Virtual Environment (Conda or Standard Python venv)
+
+---
+
+## Installation & Setup
+
+This project is professionally configured as an installable Python package via `pyproject.toml` (PEP 621 Standard). Follow these steps to set it up:
+
+### Step 1: Open the Project
+Open your root project folder (`orangehrm-rpa-automation`) in your preferred terminal or **Visual Studio Code (VS Code)**.
+
+### Step 2: Activate the Virtual Environment
+Activate the Conda virtual environment where you want to install the package:
+```powershell
+conda activate orangehrm-env

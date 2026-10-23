@@ -38,3 +38,7 @@ class ExcelExportError(OrangeHRMBaseException):
     """Raised when Pandas or Openpyxl fails to write, style, or format workbooks."""
 
     pass
+
+class EmailAutomationError(OrangeHRMBaseException):
+    """Raised when Phase 4 Thunderbird desktop email composition, attachment, or reply fails."""
+    pass
