@@ -18,7 +18,9 @@ src/devdata/sample_attachment.pdf
 src/keywords/__init__.py
 src/keywords/orangehrm_keywords.py
 src/pages/__init__.py
+src/pages/locators.py
 src/pages/login_page.py
 src/pages/my_info_page.py
 src/pages/thunderbird_mailer.py
 src/pages/time_page.py
+tests/test_pages_and_build.py

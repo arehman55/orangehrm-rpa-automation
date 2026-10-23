@@ -16,7 +16,7 @@ Ensure the following are installed and configured on your system before running 
 1. **Python 3.9+**
 2. **Mozilla Thunderbird** (Logged in with the sender's email account)
 3. **Google Chrome** (For Selenium web automation)
-4. **Operating System:** Windows 10/11 or Linux (Ubuntu on Xorg)
+4. **Operating System:** Windows 10/11 or Linux
 
 ---
 
@@ -24,7 +24,7 @@ Ensure the following are installed and configured on your system before running 
 
 This project is professionally packaged using the `pyproject.toml` (PEP 621) standard. It is designed to be fully portable and self-contained.
 
-### Option A: Install from Source (Recommended for Testing)
+### Option A: Install from Source (Recommended for Development/Testing)
 Navigate to the root directory of the project where `pyproject.toml` is located:
 
 ```bash
@@ -48,9 +48,14 @@ pip install orangehrm_rpa_automation-1.0.0-py3-none-any.whl
 
 Once installed, the package registers a global command-line interface (CLI) command `run-rpa`. You can execute this command from **any directory**, and the bot will dynamically create an `output` folder in your current working directory.
 
-**To run the complete 4-Phase Automation Suite:**
+**To run the complete 4-Phase Automation Suite via Pure Python:**
 ```bash
-run-rpa
+run-rpa --mode python
+```
+
+**To run the suite via Robot Framework (Default):**
+```bash
+run-rpa --mode robot
 ```
 
 **To test specific components (e.g., Email Dispatch Only):**
@@ -60,10 +65,30 @@ run-rpa --mode email-only
 
 ---
 
-## Project Outputs
-Upon successful execution, the bot generates a dynamic `output/` directory in the terminal's current path containing:
-* `OrangeHRM_Data.xlsx` (Phase 2 Scraped Data)
-* `Details.xlsx` (Phase 3 Comprehensive Employee Data with internal PDF hyperlinks)
-* Temporary HTML bodies for Thunderbird dispatch.
+## Development & Architecture
+
+This project strictly adheres to Enterprise Software Architecture principles. 
+
+* **Page Object Model (POM):** All Selenium locators (XPaths/CSS) are centralized in `src/pages/locators.py` to ensure maintainability.
+* **Environment Isolation:** UI automation tools handle OS-level library conflicts natively (e.g., isolating Conda variables from Snap packages on Ubuntu).
+
+### Running Unit Tests
+To verify core logic, exception handling, and mock executions without launching a browser, run the built-in test suite:
+```bash
+python -m unittest discover -s tests
+```
+
+### Automated Build Pipeline
+An automated build script is provided to cleanly generate the `.whl` package. It safely purges old `build/` and `dist/` artifacts before building a fresh release:
+```bash
+python build_script.py
+```
+*The newly generated `.whl` file will be located in the `dist/` directory.*
 
 ---
+
+## Project Outputs
+Upon successful execution, the bot generates a dynamic `output/` directory in the terminal's current path containing:
+- `OrangeHRM_Data.xlsx` (Phase 2 Scraped Data)
+- `Details.xlsx` (Phase 3 Comprehensive Employee Data with internal PDF hyperlinks)
+- Temporary HTML bodies for Thunderbird dispatch.

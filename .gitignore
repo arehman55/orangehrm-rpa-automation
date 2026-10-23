@@ -17,3 +17,9 @@ env/
 # OS & Editor files
 .DS_Store
 Thumbs.db
+.vscode/
+
+# Build artifacts
+build/
+dist/
+*.whl

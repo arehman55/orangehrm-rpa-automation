@@ -5,20 +5,22 @@ Vue.js input clearing, custom dropdown handling, and toast assertions.
 
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
+
+from selenium.common.exceptions import (
+    ElementClickInterceptedException,
+    StaleElementReferenceException,
+    TimeoutException,
+    WebDriverException,
+)
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import (
-    TimeoutException,
-    NoSuchElementException,
-    StaleElementReferenceException,
-    ElementClickInterceptedException,
-)
+from selenium.webdriver.support.ui import WebDriverWait
+
+from src.pages.locators import BaseLocators
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +29,23 @@ class BasePage:
     """Foundational wrapper for all OrangeHRM Page Objects using pure Python Selenium."""
 
     # Global OrangeHRM Vue.js Locators
-    LOADING_SPINNER = (By.CSS_SELECTOR, "div.oxd-loading-spinner")
-    FORM_LOADER = (By.CSS_SELECTOR, "div.oxd-form-loader")
-    SUCCESS_TOAST = (
-        By.XPATH,
-        "//div[contains(@class, 'oxd-toast')]//*[contains(text(), 'Success') or contains(text(), 'Successfully') or contains(text(), 'Saved')]",
-    )
-    SIDEBAR_ITEM_TPL = "//aside[@class='oxd-sidepanel']//span[normalize-space()='{menu_name}']/ancestor::a"
+    LOADING_SPINNER = BaseLocators.LOADING_SPINNER
+    FORM_LOADER = BaseLocators.FORM_LOADER
+    SUCCESS_TOAST = BaseLocators.SUCCESS_TOAST
 
     def __init__(self, driver: WebDriver, timeout: int = 20) -> None:
+        """Initialize the page with a Selenium driver and explicit-wait timeout.
+
+        Args:
+            driver (WebDriver): Active Selenium browser session.
+            timeout (int): Default explicit-wait timeout in seconds.
+
+        Returns:
+            None.
+
+        Example:
+            page = BasePage(driver, timeout=20)
+        """
         self.driver = driver
         self.timeout = timeout
         self.wait = WebDriverWait(
@@ -46,32 +56,62 @@ class BasePage:
 
     def wait_for_Check_loaders(self) -> None:
         """
-        Waits for OrangeHRM's asynchronous Vue loading spinners to disappear.
-        Uses a fast 1-second check so we never miss transient toast messages.
-        """
-        try:
-            WebDriverWait(self.driver, 1).until(
-                EC.visibility_of_element_located(self.LOADING_SPINNER)
-            )
-        except TimeoutException:
-            pass
+        Wait for OrangeHRM's asynchronous loaders to disappear.
 
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            page.wait_for_Check_loaders()
+        """
         self.wait.until(EC.invisibility_of_element_located(self.LOADING_SPINNER))
         self.wait.until(EC.invisibility_of_element_located(self.FORM_LOADER))
 
     def find_visible(self, locator: Tuple[str, str]) -> WebElement:
-        """Waits for an element to be visible in the DOM and returns it."""
+        """Wait for and return a visible element.
+
+        Args:
+            locator (Tuple[str, str]): Selenium locator tuple.
+
+        Returns:
+            WebElement: Visible matching element.
+
+        Example:
+            field = page.find_visible(locator)
+        """
         self.wait_for_Check_loaders()
         return self.wait.until(EC.visibility_of_element_located(locator))
 
     def find_all_visible(self, locator: Tuple[str, str]) -> List[WebElement]:
-        """Waits for all matching elements to be visible."""
+        """Wait for and return all visible matching elements.
+
+        Args:
+            locator (Tuple[str, str]): Selenium locator tuple.
+
+        Returns:
+            List[WebElement]: Visible matching elements.
+
+        Example:
+            rows = page.find_all_visible(locator)
+        """
         self.wait_for_Check_loaders()
         return self.wait.until(EC.visibility_of_all_elements_located(locator))
 
     def click_element(self, locator: Tuple[str, str]) -> None:
         """
-        Waits for an element to be clickable and clicks it safely using pure Selenium ActionChains
+        Wait for an element to be clickable and click it.
+
+        Args:
+            locator (Tuple[str, str]): Selenium locator tuple.
+
+        Returns:
+            None.
+
+        Example:
+            page.click_element(locator)
         """
         self.wait_for_Check_loaders()
         element = self.wait.until(EC.element_to_be_clickable(locator))
@@ -87,15 +127,22 @@ class BasePage:
 
     def clear_and_type(self, locator: Tuple[str, str], text: str) -> None:
         """
-        Clears a Vue.js bound input field using pure Selenium actions and CTRL+A + BACKSPACE.
-        Dismisses any overlapping calendar popups (oxd-calendar-wrapper) before clicking.
+        Clear a Vue.js input and type text using Selenium actions.
+
+        Args:
+            locator (Tuple[str, str]): Selenium input locator.
+            text (str): Text to enter.
+
+        Returns:
+            None.
+
+        Example:
+            page.clear_and_type(locator, "Admin")
         """
         element = self.find_visible(locator)
 
         # If an OrangeHRM date-picker calendar popup is open and overlapping, dismiss it via ESCAPE
-        open_calendars = self.driver.find_elements(
-            By.CSS_SELECTOR, "div.oxd-calendar-wrapper"
-        )
+        open_calendars = self.driver.find_elements(*BaseLocators.CALENDAR_WRAPPER)
         if open_calendars:
             ActionChains(self.driver).send_keys(Keys.ESCAPE).perform()
 
@@ -119,36 +166,49 @@ class BasePage:
         if "yyyy" in placeholder or "dd" in placeholder or "mm" in placeholder:
             element.send_keys(Keys.TAB)
 
-    def _safe_xpath_literal(self, text: str) -> str:
-        """Safely formats strings containing single quotes for XPath expressions."""
-        if "'" in text:
-            parts = text.split("'")
-            concat_args = ', "\'", '.join([f"'{p}'" for p in parts])
-            return f"concat({concat_args})"
-        return f"'{text}'"
-
     def get_input_by_label(self, label_text: str) -> Tuple[str, str]:
         """
-        Constructs a dynamic XPath locator for any OrangeHRM input field based on its label.
+        Build the input or textarea locator associated with a label.
+
+        Args:
+            label_text (str): Visible label text.
+
+        Returns:
+            Tuple[str, str]: Selenium locator tuple.
+
+        Example:
+            locator = page.get_input_by_label("Employee Id")
         """
-        safe_val = self._safe_xpath_literal(label_text)
-        xpath = (
-            f"//label[normalize-space()={safe_val}]"
-            f"/ancestor::div[contains(@class, 'oxd-input-group')]"
-            f"//input | "
-            f"//label[normalize-space()={safe_val}]"
-            f"/ancestor::div[contains(@class, 'oxd-input-group')]"
-            f"//textarea"
-        )
-        return (By.XPATH, xpath)
+        return BaseLocators.input_by_label(label_text)
 
     def fill_field_by_label(self, label_text: str, value: str) -> None:
-        """Fills an OrangeHRM input/textarea identified by its UI label."""
+        """Fill an input or textarea identified by its visible label.
+
+        Args:
+            label_text (str): Visible field label.
+            value (str): Value to enter.
+
+        Returns:
+            None.
+
+        Example:
+            page.fill_field_by_label("Employee Id", "EMP-9042")
+        """
         locator = self.get_input_by_label(label_text)
         self.clear_and_type(locator, value)
 
     def read_field_by_label(self, label_text: str) -> str:
-        """Reads the current `.get_attribute('value')` of an input field by its label."""
+        """Read the current value of a labeled input field.
+
+        Args:
+            label_text (str): Visible field label.
+
+        Returns:
+            str: Field value or ``N/A`` when unavailable.
+
+        Example:
+            employee_id = page.read_field_by_label("Employee Id")
+        """
         locator = self.get_input_by_label(label_text)
         try:
             element = self.find_visible(locator)
@@ -161,22 +221,27 @@ class BasePage:
         self, label_text: str, option_text: Optional[str] = None, index: int = 2
     ) -> str:
         """
-        Handles custom OrangeHRM Vue dropdowns (`div.oxd-select-text`) using pure Selenium clicks.
+        Select an option from a custom OrangeHRM dropdown.
+
+        Args:
+            label_text (str): Visible dropdown label.
+            option_text (Optional[str]): Desired visible option text.
+            index (int): One-based fallback option index.
+
+        Returns:
+            str: Selected option text.
+
+        Example:
+            country = page.select_dropdown_by_label("Country", "Pakistan")
         """
-        safe_val = self._safe_xpath_literal(label_text)
-        dropdown_xpath = (
-            f"//label[normalize-space()={safe_val}]"
-            f"/ancestor::div[contains(@class, 'oxd-input-group')]"
-            f"//div[contains(@class, 'oxd-select-text-input')]"
-        )
-        self.click_element((By.XPATH, dropdown_xpath))
+        self.click_element(BaseLocators.dropdown_by_label(label_text))
 
         if option_text:
-            safe_opt = self._safe_xpath_literal(option_text)
-            option_xpath = f"//div[@role='listbox']//span[normalize-space()={safe_opt}]"
             try:
                 opt_el = WebDriverWait(self.driver, 5).until(
-                    EC.element_to_be_clickable((By.XPATH, option_xpath))
+                    EC.element_to_be_clickable(
+                        BaseLocators.dropdown_option(option_text)
+                    )
                 )
                 selected_val = opt_el.text.strip()
                 ActionChains(self.driver).move_to_element(opt_el).click().perform()
@@ -189,9 +254,8 @@ class BasePage:
                     index,
                 )
 
-        options_xpath = "//div[@role='listbox']//div[@role='option']//span"
         options = self.wait.until(
-            EC.presence_of_all_elements_located((By.XPATH, options_xpath))
+            EC.presence_of_all_elements_located(BaseLocators.DROPDOWN_OPTIONS)
         )
         target_option = options[min(index - 1, len(options) - 1)]
         selected_val = target_option.text.strip()
@@ -199,29 +263,51 @@ class BasePage:
         return selected_val
 
     def read_dropdown_by_label(self, label_text: str) -> str:
-        """Reads the currently selected value in a custom OrangeHRM dropdown."""
-        safe_val = self._safe_xpath_literal(label_text)
-        dropdown_xpath = (
-            f"//label[normalize-space()={safe_val}]"
-            f"/ancestor::div[contains(@class, 'oxd-input-group')]"
-            f"//div[contains(@class, 'oxd-select-text-input')]"
-        )
+        """Read the selected value from a custom dropdown.
+
+        Args:
+            label_text (str): Visible dropdown label.
+
+        Returns:
+            str: Selected value or ``N/A`` when unavailable.
+
+        Example:
+            status = page.read_dropdown_by_label("Marital Status")
+        """
         try:
-            el = self.find_visible((By.XPATH, dropdown_xpath))
+            el = self.find_visible(BaseLocators.dropdown_by_label(label_text))
             text_val = el.text.strip()
             return text_val if text_val and text_val != "-- Select --" else "N/A"
         except TimeoutException:
             return "N/A"
 
     def navigate_sidebar(self, menu_name: str) -> None:
-        """Navigates via the left main navigation sidebar using pure Selenium clicks."""
-        locator = (By.XPATH, self.SIDEBAR_ITEM_TPL.format(menu_name=menu_name))
-        self.click_element(locator)
+        """Navigate through the main sidebar.
+
+        Args:
+            menu_name (str): Visible sidebar menu name.
+
+        Returns:
+            None.
+
+        Example:
+            page.navigate_sidebar("My Info")
+        """
+        self.click_element(BaseLocators.sidebar_item(menu_name))
         self.wait_for_Check_loaders()
 
     def validate_success_toast(self) -> bool:
         """
-        Checks for the green 'Success' toast notification and waits for loaders to settle.
+        Check for a success toast and wait for loaders to settle.
+
+        Args:
+            None.
+
+        Returns:
+            bool: Always ``True`` after the save state settles.
+
+        Example:
+            saved = page.validate_success_toast()
         """
         try:
             toast = WebDriverWait(self.driver, 6).until(
@@ -237,40 +323,34 @@ class BasePage:
         self, file_path: Path, comment: str
     ) -> None:
         """
-        Clicks '+ Add' in the 'Attachments' section, uploads file via pure Selenium send_keys,
-        adds a description comment, and clicks Save.
+        Upload and save an attachment in the current section.
+
+        Args:
+            file_path (Path): Local file to upload.
+            comment (str): Attachment description.
+
+        Returns:
+            None.
+
+        Example:
+            page.upload_attachment_in_current_section(pdf_path, "Verification")
         """
         self.wait_for_Check_loaders()
-        add_btn_xpath = (
-            "//h6[normalize-space()='Attachments']"
-            "/ancestor::div[contains(@class, 'orangehrm-action-header') or contains(@class, 'orangehrm-card-container')]"
-            "//button[contains(., 'Add') or contains(@class, 'oxd-button')]"
-        )
-        file_input_xpath = "//input[@type='file']"
-        comment_textarea_xpath = (
-            "//h6[normalize-space()='Attachments']"
-            "/ancestor::div[contains(@class, 'orangehrm-card-container') or contains(@class, 'orangehrm-horizontal-padding')]//textarea"
-        )
-        save_btn_xpath = (
-            "//h6[normalize-space()='Attachments']"
-            "/ancestor::div[contains(@class, 'orangehrm-card-container') or contains(@class, 'orangehrm-horizontal-padding')]//button[@type='submit' and (normalize-space()='Save' or contains(., 'Save'))]"
-        )
-
         try:
             add_btn = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, add_btn_xpath))
+                EC.element_to_be_clickable(BaseLocators.ATTACHMENT_ADD_BUTTON)
             )
             ActionChains(self.driver).move_to_element(add_btn).click().perform()
 
             self.wait_for_Check_loaders()
 
             raw_file_input = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, file_input_xpath))
+                EC.presence_of_element_located(BaseLocators.ATTACHMENT_FILE_INPUT)
             )
             raw_file_input.send_keys(str(file_path.resolve()))
 
             textarea = self.wait.until(
-                EC.visibility_of_element_located((By.XPATH, comment_textarea_xpath))
+                EC.visibility_of_element_located(BaseLocators.ATTACHMENT_COMMENT)
             )
             ActionChains(self.driver).move_to_element(textarea).perform()
             textarea.click()
@@ -279,33 +359,40 @@ class BasePage:
             textarea.send_keys(comment)
 
             save_btn = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, save_btn_xpath))
+                EC.element_to_be_clickable(BaseLocators.ATTACHMENT_SAVE_BUTTON)
             )
             ActionChains(self.driver).move_to_element(save_btn).click().perform()
 
             self.validate_success_toast()
             self.wait_for_Check_loaders()
-        except Exception as exc:
+        except (TimeoutException, WebDriverException) as exc:
             logger.warning("Could not complete file upload in current section: %s", exc)
 
     def scrape_attachments_in_current_section(
         self, section_name: str
     ) -> List[Dict[str, Any]]:
         """
-        Scrapes uploaded attachment table rows under the 'Attachments' section using pure Selenium DOM traversal.
+        Scrape attachment rows from the current section.
+
+        Args:
+            section_name (str): Section name used for diagnostic logging.
+
+        Returns:
+            List[Dict[str, Any]]: Scraped attachment records.
+
+        Example:
+            records = page.scrape_attachments_in_current_section("Job")
         """
         self.wait_for_Check_loaders()
-        attachment_rows_xpath = "//div[contains(@class, 'orangehrm-container')]//div[@class='oxd-table-body']//div[@role='row']"
-
         records: List[Dict[str, Any]] = []
         try:
             WebDriverWait(self.driver, 6).until(
-                EC.presence_of_element_located((By.XPATH, attachment_rows_xpath))
+                EC.presence_of_element_located(BaseLocators.ATTACHMENT_ROWS)
             )
-            rows = self.driver.find_elements(By.XPATH, attachment_rows_xpath)
+            rows = self.driver.find_elements(*BaseLocators.ATTACHMENT_ROWS)
 
             for row in rows:
-                cells = row.find_elements(By.XPATH, ".//div[@role='cell']")
+                cells = row.find_elements(*BaseLocators.ATTACHMENT_CELLS)
                 if len(cells) >= 7:
                     file_name = cells[1].text.strip()
                     description = cells[2].text.strip()
@@ -320,9 +407,9 @@ class BasePage:
                                 "File Name": file_name,
                                 "Description": description if description else "N/A",
                                 "Size": size if size else "N/A",
-                                "Type": file_type if file_type else "PDF",
+                                "Type": file_type if file_type else "N/A",
                                 "Date Added": date_added if date_added else "N/A",
-                                "Added By": added_by if added_by else "Admin",
+                                "Added By": added_by if added_by else "N/A",
                             }
                         )
         except TimeoutException:
@@ -336,41 +423,55 @@ class BasePage:
         self, section_name: str
     ) -> Dict[str, Any]:
         """
-        Captures attachment details or triggers download from the section table using pure Selenium interactions.
+        Capture the first attachment record from the current section.
+
+        Args:
+            section_name (str): Section name used for diagnostic logging.
+
+        Returns:
+            Dict[str, Any]: Attachment metadata or an explicit no-attachment record.
+
+        Example:
+            record = page.download_attachment_from_current_section("Job")
         """
         self.wait_for_Check_loaders()
-        attachment_rows_xpath = "//div[contains(@class, 'orangehrm-container')]//div[@class='oxd-table-body']//div[@role='row']"
-
-        record: Dict[str, Any] = {}
         try:
             WebDriverWait(self.driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, attachment_rows_xpath))
+                EC.presence_of_element_located(BaseLocators.ATTACHMENT_ROWS)
             )
-            rows = self.driver.find_elements(By.XPATH, attachment_rows_xpath)
+            rows = self.driver.find_elements(*BaseLocators.ATTACHMENT_ROWS)
             if rows:
-                cells = rows[0].find_elements(By.XPATH, ".//div[@role='cell']")
+                cells = rows[0].find_elements(*BaseLocators.ATTACHMENT_CELLS)
                 if len(cells) >= 7:
                     file_name = cells[1].text.strip()
                     if file_name and file_name != "No Records Found":
                         return {
                             "File Name": file_name,
-                            "Description": cells[2].text.strip()
-                            or "My Info test attachment",
-                            "Size": cells[3].text.strip() or "34.00 B",
-                            "Type": cells[4].text.strip() or "text/plain",
-                            "Date Added": cells[5].text.strip() or "2026-10-16",
-                            "Added By": cells[6].text.strip() or "Admin",
+                            "Description": cells[2].text.strip() or "N/A",
+                            "Size": cells[3].text.strip() or "N/A",
+                            "Type": cells[4].text.strip() or "N/A",
+                            "Date Added": cells[5].text.strip() or "N/A",
+                            "Added By": cells[6].text.strip() or "N/A",
                             "Download_Status": "Captured Successfully",
                         }
-        except Exception:
-            pass
+        except TimeoutException:
+            logger.warning(
+                "Attachment table was not found or timed out in section [%s].",
+                section_name,
+            )
+        except WebDriverException as exc:
+            logger.error(
+                "Selenium failed while reading attachments in section [%s]: %s",
+                section_name,
+                exc,
+            )
 
         return {
-            "File Name": "sample-attachment.txt",
-            "Description": "My Info BDD test attachment",
-            "Size": "34.00 B",
-            "Type": "text/plain",
-            "Date Added": "2026-10-16",
-            "Added By": "Admin",
-            "Download_Status": "Default Recorded",
+            "File Name": "N/A",
+            "Description": "N/A",
+            "Size": "N/A",
+            "Type": "N/A",
+            "Date Added": "N/A",
+            "Added By": "N/A",
+            "Download_Status": "No Attachment Found",
         }

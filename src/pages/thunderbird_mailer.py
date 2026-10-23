@@ -1,18 +1,21 @@
 """
 Phase 4: Mozilla Thunderbird Desktop Email Automation Page Object Model.
-Uses Pure Python, cross-platform RPA.Desktop (keyboard shortcuts), 
+Uses Pure Python, cross-platform RPA.Desktop (keyboard shortcuts),
 CLI compose commands, and OS detection for Windows & Ubuntu compatibility.
 """
 
 import logging
-import subprocess
+import os
 import platform
-from time import sleep
+import subprocess
+import time
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
+
 import pandas as pd
 from RPA.Desktop import Desktop
-from src.config import TEAM_LEAD_EMAIL, EMAIL_1_SUBJECT, THUNDERBIRD_PATHS, OUTPUT_DIR
+
+from src.config import EMAIL_1_SUBJECT, OUTPUT_DIR, TEAM_LEAD_EMAIL, THUNDERBIRD_PATHS
 from src.exceptions import EmailAutomationError
 
 logger = logging.getLogger(__name__)
@@ -22,54 +25,85 @@ class ThunderbirdMailer:
     """Page Object for automating Mozilla Thunderbird using cross-platform CLI and Keyboard shortcuts."""
 
     def __init__(self, timeout: int = 20) -> None:
+        """Initialize the desktop adapter and Thunderbird executable.
+
+        Args:
+            timeout (int): Maximum compose-window startup wait in seconds.
+
+        Returns:
+            None.
+
+        Example:
+            mailer = ThunderbirdMailer(timeout=10)
+        """
         self.desktop = Desktop()
         self.timeout = timeout
         self.tb_exe = self._resolve_thunderbird_executable()
 
     def _resolve_thunderbird_executable(self) -> str:
-        """Locates Thunderbird executable based on the operating system (Windows/Linux)."""
+        """Resolve the Thunderbird executable for the current operating system.
+
+        Args:
+            None.
+
+        Returns:
+            str: Executable command or path.
+
+        Example:
+            executable = mailer._resolve_thunderbird_executable()
+        """
         current_os = platform.system()
-        
+
         if current_os == "Linux":
             # On Ubuntu/Linux, Thunderbird is universally accessible via terminal command
             return "thunderbird"
-            
+
         elif current_os == "Windows":
             for path in THUNDERBIRD_PATHS:
                 if path.exists():
                     return str(path)
-                    
+
         raise EmailAutomationError(
             f"Mozilla Thunderbird executable not found for OS: {current_os}"
         )
 
     def send_timesheet_html_email(self, timesheet_excel_path: Path) -> None:
         """
-        Email 1: Reads scraped timesheet Excel, builds HTML table,
-        attaches OrangeHRM_Data.xlsx, and sends via Thunderbird.
+        Send the timesheet workbook as an HTML email through Thunderbird.
+
+        Args:
+            timesheet_excel_path (Path): Timesheet workbook to attach.
+
+        Returns:
+            None.
+
+        Example:
+            mailer.send_timesheet_html_email(Path("output/OrangeHRM_Data.xlsx"))
         """
         if not timesheet_excel_path.exists():
             raise EmailAutomationError(
                 f"Timesheet Excel file not found at: {timesheet_excel_path}"
             )
 
-        logger.info("Building HTML tabular body from '%s'...", timesheet_excel_path.name)
+        logger.info(
+            "Building HTML tabular body from '%s'...", timesheet_excel_path.name
+        )
         df = pd.read_excel(timesheet_excel_path)
         records = df.to_dict(orient="records")
 
         html_body = self._build_timesheet_html(records)
-        
+
         # FIX: Using OUTPUT_DIR instead of tempfile
         temp_html = OUTPUT_DIR / "orangehrm_email1_body.html"
         temp_html.write_text(html_body, encoding="utf-8")
 
-        file_uri = timesheet_excel_path.resolve().as_uri()
+        attachment_path = os.path.abspath(timesheet_excel_path)
         compose_arg = (
             f"to='{TEAM_LEAD_EMAIL}',"
             f"subject='{EMAIL_1_SUBJECT}',"
             f"format='html',"
             f"message='{temp_html.resolve()}',"
-            f"attachment='{file_uri}'"
+            f"attachment='{attachment_path}'"
         )
 
         logger.info("Launching Thunderbird Compose window for Email 1 (Timesheet)...")
@@ -78,8 +112,16 @@ class ThunderbirdMailer:
 
     def send_reply_with_details_excel(self, details_excel_path: Path) -> None:
         """
-        Email 2: Dispatches the Details.xlsx as a threaded reply using CLI compose 
-        to ensure cross-platform stability on both Ubuntu and Windows.
+        Send the details workbook as a threaded Thunderbird reply.
+
+        Args:
+            details_excel_path (Path): Details workbook to attach.
+
+        Returns:
+            None.
+
+        Example:
+            mailer.send_reply_with_details_excel(Path("output/Details.xlsx"))
         """
         if not details_excel_path.exists():
             raise EmailAutomationError(
@@ -95,53 +137,81 @@ class ThunderbirdMailer:
 
         # Prepends 'Re:' to thread it visually in the recipient's inbox
         reply_subject = f"Re: {EMAIL_1_SUBJECT}"
-        file_uri = details_excel_path.resolve().as_uri()
+        attachment_path = os.path.abspath(details_excel_path)
 
         compose_arg = (
             f"to='{TEAM_LEAD_EMAIL}',"
             f"subject='{reply_subject}',"
             f"format='html',"
             f"message='{temp_reply_html.resolve()}',"
-            f"attachment='{file_uri}'"
+            f"attachment='{attachment_path}'"
         )
-        
+
         logger.info("Launching Thunderbird Compose window for Email 2 (Reply)...")
         self._compose_and_dispatch(compose_arg)
         logger.info("Email 2 (Reply with Details.xlsx) sent successfully!")
 
     def _compose_and_dispatch(self, compose_arg: str) -> None:
         """
-        Executes `thunderbird -compose` cross-platform, clears conflicting Linux env vars,
-        waits for UI to render, and uses universal Ctrl+Enter shortcut to dispatch.
+        Open a Thunderbird compose window and dispatch the message.
+
+        Args:
+            compose_arg (str): Thunderbird compose argument string.
+
+        Returns:
+            None.
+
+        Example:
+            mailer._compose_and_dispatch("to='team@example.com'")
         """
-        import os
-        
         try:
-            # Clean environment for Linux Ubuntu (Removes Conda/Snap library conflicts)
-            env = os.environ.copy()
-            for key in ["LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONHOME"]:
-                env.pop(key, None)
+            # Remove Conda and Snap-injected library/module paths before launch.
+            clean_env = os.environ.copy()
+            for key in [
+                "LD_LIBRARY_PATH",
+                "LD_PRELOAD",
+                "PYTHONPATH",
+                "PYTHONHOME",
+                "GIO_MODULE_DIR",
+                "GIO_LAUNCHED_DESKTOP_FILE",
+                "GIO_LAUNCHED_DESKTOP_FILE_PID",
+                "GTK_PATH",
+                "GTK_EXE_PREFIX",
+                "GTK_IM_MODULE_FILE",
+            ]:
+                clean_env.pop(key, None)
 
             # 1. Trigger the Compose window via OS terminal with isolated env
-            subprocess.Popen([self.tb_exe, "-compose", compose_arg], env=env)
+            subprocess.Popen(
+                [self.tb_exe, "-compose", compose_arg],
+                env=clean_env,
+            )
 
-            # 2. Wait for the Compose UI to render
-            sleep(5)
+            # 2. Allow Thunderbird time to render and focus the compose window.
+            time.sleep(5)
 
             # 3. Dispatch using Universal Keyboard Shortcut (Ctrl + Enter)
             logger.info("Dispatching email via Ctrl+Enter shortcut...")
             self.desktop.press_keys("ctrl", "enter")
-            
-            sleep(2)
 
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             raise EmailAutomationError(
                 f"Failed during Thunderbird email dispatch: {exc}"
             ) from exc
 
     @staticmethod
-    def _build_timesheet_html(records: List[Dict[str, Any]]) -> str:
-        """Generates a clean, professional black-and-white HTML email body with an inline CSS table."""
+    def _build_timesheet_html(records: list[dict[str, Any]]) -> str:
+        """Build an HTML table for timesheet records.
+
+        Args:
+            records (list[dict[str, Any]]): Timesheet rows.
+
+        Returns:
+            str: Rendered HTML email body.
+
+        Example:
+            html = ThunderbirdMailer._build_timesheet_html(records)
+        """
         if not records:
             return "<p>No timesheet records available.</p>"
 
@@ -160,7 +230,12 @@ class ThunderbirdMailer:
 
             for col_name in headers:
                 val_str = str(row.get(col_name, "")).strip()
-                if col_name not in ("Entry_No", "Project", "Activity", "Total") and val_str not in ("00:00", "0", "", "N/A"):
+                if col_name not in (
+                    "Entry_No",
+                    "Project",
+                    "Activity",
+                    "Total",
+                ) and val_str not in ("00:00", "0", "", "N/A"):
                     active_day_label = col_name
 
             for col_name in headers:
@@ -171,7 +246,7 @@ class ThunderbirdMailer:
                 elif col_name == "Activity":
                     cell_style = f"background-color:{bg_color}; color:#333333; font-weight:normal; padding:8px 10px; border:1px solid #CCCCCC;"
                 elif col_name == active_day_label:
-                    cell_style = f"background-color:#EAEAEA; color:#000000; font-weight:bold; text-align:center; padding:8px 10px; border:1.5px solid #000000;"
+                    cell_style = "background-color:#EAEAEA; color:#000000; font-weight:bold; text-align:center; padding:8px 10px; border:1.5px solid #000000;"
                     val_str = f"{val_str} *"
                 else:
                     cell_style = f"background-color:{bg_color}; color:#555555; text-align:center; padding:8px 10px; border:1px solid #CCCCCC;"
@@ -203,7 +278,17 @@ class ThunderbirdMailer:
 
     @staticmethod
     def _build_details_reply_html() -> str:
-        """Generates a clean, professional black-and-white HTML body for Email 2 reply."""
+        """Build the HTML body for the details workbook reply.
+
+        Args:
+            None.
+
+        Returns:
+            str: Rendered HTML email body.
+
+        Example:
+            html = ThunderbirdMailer._build_details_reply_html()
+        """
         sections = [
             ("1. Personal Details", "Completed + PDF Hyperlink"),
             ("2. Contact Details", "Completed + PDF Hyperlink"),

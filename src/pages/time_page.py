@@ -11,19 +11,22 @@ without any JavaScript injections:
 """
 
 import logging
-from typing import List, Dict, Any, Set, Tuple
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from typing import Any, Dict, List, Set, Tuple
+
 from selenium.common.exceptions import (
-    TimeoutException,
-    StaleElementReferenceException,
     ElementClickInterceptedException,
+    StaleElementReferenceException,
+    TimeoutException,
+    WebDriverException,
 )
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
 from src.base_page import BasePage
 from src.exceptions import TimesheetAutomationError
+from src.pages.locators import TimeLocators
 
 logger = logging.getLogger(__name__)
 
@@ -31,69 +34,31 @@ logger = logging.getLogger(__name__)
 class TimePage(BasePage):
     """Page Object for OrangeHRM Time & My Timesheets module using pure Python Selenium."""
 
-    # Navigation Locators
-    TIMESHEETS_TOP_MENU = (
-        By.XPATH,
-        "//nav[@aria-label='Topbar Menu']//span[contains(normalize-space(), 'Timesheets')]",
-    )
-    MY_TIMESHEETS_OPTION = (
-        By.XPATH,
-        "//ul[@class='oxd-dropdown-menu']//a[normalize-space()='My Timesheets']",
-    )
-
-    # View / Edit State Buttons
-    EDIT_BUTTON = (
-        By.XPATH,
-        "//button[normalize-space()='Edit']",
-    )
-    CREATE_TIMESHEET_BUTTON = (
-        By.XPATH,
-        "//button[normalize-space()='Create Timesheet']",
-    )
-    SAVE_TIMESHEET_BUTTON = (
-        By.XPATH,
-        "//button[@type='submit' and normalize-space()='Save']",
-    )
-
-    # Only count actual data rows (rows containing a Project input), excluding the trailing 'Add Row' (+) row inside tbody!
-    EDITABLE_DATA_ROWS = (
-        By.XPATH,
-        "//table[contains(@class, 'orangehrm-timesheet-table')]//tbody/tr[.//input[contains(@placeholder, 'Type for hints')]]",
-    )
-
-    # Exact locator for the '+' icon button next to 'Add Row'
-    ADD_ROW_PLUS_BUTTON = (
-        By.XPATH,
-        "//table[contains(@class, 'orangehrm-timesheet-table')]//td[contains(normalize-space(), 'Add Row')]//button | //table[contains(@class, 'orangehrm-timesheet-table')]//button[.//i[contains(@class, 'bi-plus')]]",
-    )
-
-    DELETE_ROW_BUTTONS = (
-        By.XPATH,
-        "//table[contains(@class, 'orangehrm-timesheet-table')]//tbody//i[contains(@class, 'bi-trash')]/ancestor::button",
-    )
-
-    # Dropdown Option Locators (Active Listbox)
-    AUTOCOMPLETE_VALID_OPTIONS = (
-        By.XPATH,
-        "//div[@role='listbox']//div[@role='option' and not(contains(normalize-space(), 'Searching')) and not(contains(normalize-space(), 'No Records Found'))]",
-    )
-    ACTIVITY_VALID_OPTIONS = (
-        By.XPATH,
-        "//div[@role='listbox']//div[@role='option' and not(contains(normalize-space(), '-- Select --')) and not(contains(normalize-space(), 'No Records Found'))]",
-    )
-
-    # Read-Only View Table Locators for Final Scraping
-    SAVED_TABLE_HEADERS = (
-        By.XPATH,
-        "//table[contains(@class, 'orangehrm-timesheet-table')]//thead//th",
-    )
-    SAVED_TABLE_ROWS = (
-        By.XPATH,
-        "//table[contains(@class, 'orangehrm-timesheet-table')]//tbody//tr[not(contains(@class, '--total'))]",
-    )
+    TIMESHEETS_TOP_MENU = TimeLocators.TIMESHEETS_TOP_MENU
+    MY_TIMESHEETS_OPTION = TimeLocators.MY_TIMESHEETS_OPTION
+    EDIT_BUTTON = TimeLocators.EDIT_BUTTON
+    CREATE_TIMESHEET_BUTTON = TimeLocators.CREATE_TIMESHEET_BUTTON
+    SAVE_TIMESHEET_BUTTON = TimeLocators.SAVE_TIMESHEET_BUTTON
+    EDITABLE_DATA_ROWS = TimeLocators.EDITABLE_DATA_ROWS
+    ADD_ROW_PLUS_BUTTON = TimeLocators.ADD_ROW_PLUS_BUTTON
+    DELETE_ROW_BUTTONS = TimeLocators.DELETE_ROW_BUTTONS
+    AUTOCOMPLETE_VALID_OPTIONS = TimeLocators.AUTOCOMPLETE_VALID_OPTIONS
+    ACTIVITY_VALID_OPTIONS = TimeLocators.ACTIVITY_VALID_OPTIONS
+    SAVED_TABLE_HEADERS = TimeLocators.SAVED_TABLE_HEADERS
+    SAVED_TABLE_ROWS = TimeLocators.SAVED_TABLE_ROWS
 
     def navigate_to_my_timesheets(self) -> None:
-        """Navigates to Time -> Timesheets -> My Timesheets and waits for the view page."""
+        """Open the My Timesheets view and ensure it is ready.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            page.navigate_to_my_timesheets()
+        """
         logger.info("Navigating to Time -> Timesheets -> My Timesheets...")
         try:
             self.navigate_sidebar("Time")
@@ -110,21 +75,36 @@ class TimePage(BasePage):
                 ActionChains(self.driver).move_to_element(create_btn).click().perform()
                 self.wait_for_Check_loaders()
             except TimeoutException:
-                pass
+                logger.info("No new timesheet was required for the current period.")
 
             # Ensure the 'Edit' button is visible on /viewMyTimesheet
             self.find_visible(self.EDIT_BUTTON)
             logger.info(
                 "Successfully loaded My Timesheets view (%s).", self.driver.current_url
             )
-        except Exception as exc:
+        except (
+            IndexError,
+            StaleElementReferenceException,
+            TimeoutException,
+            ValueError,
+            WebDriverException,
+        ) as exc:
             raise TimesheetAutomationError(
                 f"Failed to navigate to My Timesheets: {exc}"
             ) from exc
 
     def enter_and_save_timesheet(self, timesheet_data: Dict[str, Any]) -> None:
         """
-        Performs 7 separate save cycles (Monday through Sunday) using pure Selenium actions.
+        Enter and save one timesheet row for each day of the week.
+
+        Args:
+            timesheet_data (Dict[str, Any]): Timesheet values keyed by day.
+
+        Returns:
+            None.
+
+        Example:
+            page.enter_and_save_timesheet({"hours": {"Mon": "08:00"}})
         """
         days_order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         hours_map = timesheet_data.get("hours", {})
@@ -162,7 +142,13 @@ class TimePage(BasePage):
                 # STEP 5: Click Save and validate redirect back to /viewMyTimesheet
                 self._save_and_confirm_redirect(row_num, day_name)
 
-            except Exception as exc:
+            except (
+                IndexError,
+                StaleElementReferenceException,
+                TimeoutException,
+                ValueError,
+                WebDriverException,
+            ) as exc:
                 logger.error(
                     "Failed during Timesheet Entry %d (%s) at URL '%s': %s",
                     row_num,
@@ -180,7 +166,16 @@ class TimePage(BasePage):
 
     def _enter_edit_mode(self) -> None:
         """
-        Waits for the 'Edit' button on /viewMyTimesheet and clicks it using ActionChains.
+        Enter timesheet edit mode.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            page._enter_edit_mode()
         """
         self.wait_for_Check_loaders()
         edit_btn = self.wait.until(EC.element_to_be_clickable(self.EDIT_BUTTON))
@@ -195,7 +190,17 @@ class TimePage(BasePage):
         self.wait.until(EC.presence_of_element_located(self.ADD_ROW_PLUS_BUTTON))
 
     def _reset_to_single_clean_row(self) -> None:
-        """Deletes all pre-existing rows in the timesheet using pure Selenium clicks."""
+        """Delete existing rows and ensure one editable row remains.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            page._reset_to_single_clean_row()
+        """
         self.wait_for_Check_loaders()
         delete_btns = self.driver.find_elements(*self.DELETE_ROW_BUTTONS)
         if delete_btns:
@@ -219,7 +224,17 @@ class TimePage(BasePage):
             self._click_add_row_plus_button(expected_data_rows=1)
 
     def _click_add_row_plus_button(self, expected_data_rows: int) -> None:
-        """Clicks the '+' button next to 'Add Row' using pure Selenium ActionChains."""
+        """Add rows until the expected data-row count is reached.
+
+        Args:
+            expected_data_rows (int): Required number of editable rows.
+
+        Returns:
+            None.
+
+        Example:
+            page._click_add_row_plus_button(expected_data_rows=2)
+        """
         self.wait_for_Check_loaders()
         current_data_rows = len(self.driver.find_elements(*self.EDITABLE_DATA_ROWS))
 
@@ -248,16 +263,20 @@ class TimePage(BasePage):
     def _populate_project_and_activity(
         self, row_num: int, used_pairs: Set[Tuple[str, str]]
     ) -> None:
-        """Fills the Project autocomplete and selects an Activity using pure Selenium."""
-        data_row_xpath = f"(//table[contains(@class, 'orangehrm-timesheet-table')]//tbody/tr[.//input[contains(@placeholder, 'Type for hints')]])[{row_num}]"
-        proj_input_locator = (
-            By.XPATH,
-            f"{data_row_xpath}//input[contains(@placeholder, 'Type for hints')]",
-        )
-        act_dropdown_locator = (
-            By.XPATH,
-            f"{data_row_xpath}//div[contains(@class, 'oxd-select-text-input')]",
-        )
+        """Select a unique project and activity for a timesheet row.
+
+        Args:
+            row_num (int): One-based timesheet row number.
+            used_pairs (Set[Tuple[str, str]]): Previously selected pairs.
+
+        Returns:
+            None.
+
+        Example:
+            page._populate_project_and_activity(1, set())
+        """
+        proj_input_locator = TimeLocators.project_input(row_num)
+        act_dropdown_locator = TimeLocators.activity_dropdown(row_num)
 
         search_hints = ["a", "e", "o", "i", "u", "c"]
 
@@ -332,7 +351,18 @@ class TimePage(BasePage):
         )
 
     def _type_project_hint(self, locator: Tuple[str, str], hint: str) -> None:
-        """Safely clears the project autocomplete input and types search hint using pure Selenium."""
+        """Replace the project search value with a hint.
+
+        Args:
+            locator (Tuple[str, str]): Project input locator.
+            hint (str): Search text.
+
+        Returns:
+            None.
+
+        Example:
+            page._type_project_hint(locator, "a")
+        """
         proj_input = self.find_visible(locator)
         ActionChains(self.driver).move_to_element(proj_input).perform()
         proj_input.click()
@@ -341,9 +371,20 @@ class TimePage(BasePage):
         proj_input.send_keys(hint)
 
     def _input_hours_for_day(self, row_num: int, day_idx: int, hour_val: str) -> None:
-        """Enters hours into the target day column using pure Selenium."""
-        data_row_inputs_xpath = f"(//table[contains(@class, 'orangehrm-timesheet-table')]//tbody/tr[.//input[contains(@placeholder, 'Type for hints')]])[{row_num}]//input"
-        all_inputs = self.find_all_visible((By.XPATH, data_row_inputs_xpath))
+        """Enter hours into a target day column.
+
+        Args:
+            row_num (int): One-based timesheet row number.
+            day_idx (int): Zero-based day column index.
+            hour_val (str): Hours value to enter.
+
+        Returns:
+            None.
+
+        Example:
+            page._input_hours_for_day(1, 0, "08:00")
+        """
+        all_inputs = self.find_all_visible(TimeLocators.row_inputs(row_num))
         if len(all_inputs) < 8:
             raise TimesheetAutomationError(
                 f"Expected at least 8 inputs in Row {row_num}, found {len(all_inputs)}."
@@ -360,7 +401,18 @@ class TimePage(BasePage):
         target_day_input.send_keys(Keys.TAB)
 
     def _save_and_confirm_redirect(self, row_num: int, day_name: str) -> None:
-        """Clicks Save and confirms redirect using pure Selenium."""
+        """Save a row and confirm the timesheet view is restored.
+
+        Args:
+            row_num (int): One-based timesheet row number.
+            day_name (str): Day label used in diagnostics.
+
+        Returns:
+            None.
+
+        Example:
+            page._save_and_confirm_redirect(1, "Mon")
+        """
         logger.info("Clicking 'Save' for Row %d (%s)...", row_num, day_name)
         save_btn = self.wait.until(
             EC.element_to_be_clickable(self.SAVE_TIMESHEET_BUTTON)
@@ -370,12 +422,11 @@ class TimePage(BasePage):
         except ElementClickInterceptedException:
             ActionChains(self.driver).move_to_element(save_btn).click().perform()
 
-        error_span_xpath = "//span[contains(@class, 'oxd-input-field-error-message')]"
         try:
             WebDriverWait(self.driver, 20).until(
                 EC.any_of(
                     EC.visibility_of_element_located(self.EDIT_BUTTON),
-                    EC.visibility_of_element_located((By.XPATH, error_span_xpath)),
+                    EC.visibility_of_element_located(TimeLocators.INPUT_ERROR),
                 )
             )
         except TimeoutException as exc:
@@ -383,7 +434,7 @@ class TimePage(BasePage):
                 f"Timed out waiting for page redirect after saving Row {row_num} ({day_name})."
             ) from exc
 
-        inline_errors = self.driver.find_elements(By.XPATH, error_span_xpath)
+        inline_errors = self.driver.find_elements(*TimeLocators.INPUT_ERROR)
         if inline_errors:
             err_texts = [e.text.strip() for e in inline_errors if e.text.strip()]
             if err_texts:
@@ -396,7 +447,17 @@ class TimePage(BasePage):
         logger.info("Validated Row %d (%s) saved successfully!", row_num, day_name)
 
     def scrape_saved_timesheet(self) -> List[Dict[str, Any]]:
-        """Scrapes the final saved 7-row read-only timesheet table."""
+        """Scrape the final read-only timesheet table.
+
+        Args:
+            None.
+
+        Returns:
+            List[Dict[str, Any]]: Saved timesheet rows.
+
+        Example:
+            rows = page.scrape_saved_timesheet()
+        """
         self.wait_for_Check_loaders()
         self.find_visible(self.EDIT_BUTTON)
 
@@ -410,7 +471,7 @@ class TimePage(BasePage):
         scraped_data: List[Dict[str, Any]] = []
 
         for row_idx, row in enumerate(rows_els, start=1):
-            cells = row.find_elements(By.XPATH, ".//td")
+            cells = row.find_elements(*TimeLocators.TABLE_CELL)
             row_dict: Dict[str, Any] = {"Entry_No": row_idx}
             for col_idx, cell in enumerate(cells):
                 header_name = (

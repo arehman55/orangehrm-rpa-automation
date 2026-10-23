@@ -7,10 +7,11 @@ Creates two workbooks:
 
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from src.exceptions import ExcelExportError
@@ -50,8 +51,18 @@ class ExcelManager:
         cls, file_path: Path, sheet_name: str, data: List[Dict[str, Any]]
     ) -> None:
         """
-        Writes a list of dictionaries to a specific Excel sheet (used for OrangeHRM_Data.xlsx)
-        and applies professional enterprise table styling.
+        Write records to an Excel sheet and apply table styling.
+
+        Args:
+            file_path (Path): Destination workbook path.
+            sheet_name (str): Target worksheet name.
+            data (List[Dict[str, Any]]): Rows to write.
+
+        Returns:
+            None.
+
+        Example:
+            ExcelManager.save_to_sheet(path, "Timesheet_Data", rows)
         """
         if not data:
             data = [{"Status": "No records found in UI table"}]
@@ -79,7 +90,7 @@ class ExcelManager:
                 file_path.name,
                 clean_sheet_name,
             )
-        except Exception as exc:
+        except (OSError, KeyError, TypeError, ValueError) as exc:
             logger.error(
                 "Failed to write sheet '%s' in '%s': %s",
                 clean_sheet_name,
@@ -100,9 +111,20 @@ class ExcelManager:
         pdf_path: Optional[Path] = None,
     ) -> None:
         """
-        Writes a My Info section's primary data table at the top of the worksheet,
-        and appends an 'ATTACHMENTS' heading block directly below it in the SAME worksheet
-        with clickable PDF hyperlinks.
+        Write section data and an attachments block to one worksheet.
+
+        Args:
+            file_path (Path): Destination workbook path.
+            sheet_name (str): Target worksheet name.
+            section_data (List[Dict[str, Any]]): Primary section rows.
+            attachments_data (List[Dict[str, Any]]): Attachment metadata rows.
+            pdf_path (Optional[Path]): Local PDF target for hyperlinks.
+
+        Returns:
+            None.
+
+        Example:
+            ExcelManager.save_section_with_attachments(path, "Job", rows, attachments)
         """
         if not section_data:
             section_data = [{"Status": "No records found in UI section"}]
@@ -229,12 +251,12 @@ class ExcelManager:
                     ws.row_dimensions[current_row].height = 20
                     is_even = att_idx % 2 == 1
                     row_vals = [
-                        rec.get("File Name", "sample_attachment.pdf"),
+                        rec.get("File Name", "N/A"),
                         rec.get("Description", "N/A"),
-                        rec.get("Size", "34.00 B"),
-                        rec.get("Type", "application/pdf"),
-                        rec.get("Date Added", "2026-10-18"),
-                        rec.get("Added By", "Admin"),
+                        rec.get("Size", "N/A"),
+                        rec.get("Type", "N/A"),
+                        rec.get("Date Added", "N/A"),
+                        rec.get("Added By", "N/A"),
                     ]
                     for col_idx, val in enumerate(row_vals, start=1):
                         c = ws.cell(row=current_row, column=col_idx, value=val)
@@ -273,7 +295,7 @@ class ExcelManager:
                 file_path.name,
             )
 
-        except Exception as exc:
+        except (OSError, KeyError, TypeError, ValueError) as exc:
             logger.error(
                 "Failed to save section '%s' with attachments in '%s': %s",
                 clean_sheet_name,
@@ -286,7 +308,18 @@ class ExcelManager:
 
     @classmethod
     def _apply_professional_styling(cls, file_path: Path, sheet_name: str) -> None:
-        """Applies Navy headers, zebra row striping, borders, and auto-fit column widths."""
+        """Apply workbook styling to a worksheet.
+
+        Args:
+            file_path (Path): Workbook path.
+            sheet_name (str): Worksheet to style.
+
+        Returns:
+            None.
+
+        Example:
+            ExcelManager._apply_professional_styling(path, "Timesheet_Data")
+        """
         wb = load_workbook(file_path)
         if sheet_name not in wb.sheetnames:
             return
@@ -316,7 +349,17 @@ class ExcelManager:
 
     @staticmethod
     def _auto_fit_columns(ws: Any) -> None:
-        """Automatically adjusts each column width to fit its longest text."""
+        """Adjust worksheet columns to fit their longest text.
+
+        Args:
+            ws (Any): Openpyxl worksheet object.
+
+        Returns:
+            None.
+
+        Example:
+            ExcelManager._auto_fit_columns(worksheet)
+        """
         for col in ws.columns:
             max_len = 0
             col_letter = get_column_letter(col[0].column)

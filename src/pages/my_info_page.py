@@ -5,12 +5,14 @@ Automates data entry, PDF attachment uploads, save validations, and scraping acr
 
 import logging
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from typing import Any, Dict, List, Tuple
+
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+
 from src.base_page import BasePage
+from src.pages.locators import MyInfoLocators
 
 logger = logging.getLogger(__name__)
 
@@ -18,23 +20,39 @@ logger = logging.getLogger(__name__)
 class MyInfoPage(BasePage):
     """Page Object for the 10 sub-sections inside the OrangeHRM 'My Info' module."""
 
-    TAB_LINK_TPL = "//div[@role='tablist']//a[normalize-space()='{tab_name}']"
-    PRIMARY_SAVE_BTN = (
-        By.XPATH,
-        "(//form[@class='oxd-form']//button[@type='submit' and normalize-space()='Save'])[1]",
-    )
+    PRIMARY_SAVE_BTN = MyInfoLocators.PRIMARY_SAVE_BUTTON
 
     def navigate_to_my_info(self) -> None:
-        """Opens the My Info module from the main left sidebar."""
+        """Open the My Info module from the main sidebar.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            page.navigate_to_my_info()
+        """
+
         logger.info("Navigating to My Info module...")
         self.navigate_sidebar("My Info")
         self.wait_for_Check_loaders()
 
     def open_sub_tab(self, tab_name: str) -> None:
-        """Clicks one of the 10 left-hand tabs inside My Info."""
+        """Click a tab inside the My Info module.
+
+        Args:
+            tab_name (str): Visible name of the tab to open.
+
+        Returns:
+            None.
+
+        Example:
+            page.open_sub_tab("Personal Details")
+        """
         logger.info("Switching to My Info section: [%s]", tab_name)
-        locator = (By.XPATH, self.TAB_LINK_TPL.format(tab_name=tab_name))
-        self.click_element(locator)
+        self.click_element(MyInfoLocators.tab_link(tab_name))
         self.wait_for_Check_loaders()
 
     def process_all_ten_sections(
@@ -43,11 +61,17 @@ class MyInfoPage(BasePage):
         attachment_file: Path,
     ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, List[Dict[str, Any]]]]:
         """
-        Executes data entry, PDF file upload, validation, and data scraping across all 10 My Info sections.
+        Process, validate, and scrape all ten My Info sections.
+
+        Args:
+            sections_data (Dict[str, Dict[str, Any]]): Input data keyed by section name.
+            attachment_file (Path): PDF file to upload in each applicable section.
+
         Returns:
-            Tuple containing:
-            - Dict mapping each of the 10 sheet names to its scraped data rows.
-            - Dict mapping each of the 10 section headings to its scraped attachment rows.
+            Tuple containing section data rows and attachment rows keyed by section.
+
+        Example:
+            sections, attachments = page.process_all_ten_sections(data, attachment)
         """
         self.navigate_to_my_info()
 
@@ -127,12 +151,23 @@ class MyInfoPage(BasePage):
     def _handle_personal_details(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 1: Personal Details"""
+        """Process and scrape the Personal Details section.
+
+        Args:
+            data (Dict[str, Any]): Personal details to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped personal-detail rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_personal_details(data, pdf_path)
+        """
         self.open_sub_tab("Personal Details")
 
-        self.clear_and_type((By.NAME, "firstName"), data["first_name"])
-        self.clear_and_type((By.NAME, "middleName"), data["middle_name"])
-        self.clear_and_type((By.NAME, "lastName"), data["last_name"])
+        self.clear_and_type(MyInfoLocators.FIRST_NAME_FIELD, data["first_name"])
+        self.clear_and_type(MyInfoLocators.MIDDLE_NAME_FIELD, data["middle_name"])
+        self.clear_and_type(MyInfoLocators.LAST_NAME_FIELD, data["last_name"])
         self.fill_field_by_label("Employee Id", data["employee_id"])
         self.fill_field_by_label("Other Id", data["other_id"])
         self.fill_field_by_label("Driver's License Number", data["drivers_license"])
@@ -150,15 +185,15 @@ class MyInfoPage(BasePage):
 
         scraped = [
             {
-                "First Name": self.find_visible((By.NAME, "firstName")).get_attribute(
-                    "value"
-                ),
-                "Middle Name": self.find_visible((By.NAME, "middleName")).get_attribute(
-                    "value"
-                ),
-                "Last Name": self.find_visible((By.NAME, "lastName")).get_attribute(
-                    "value"
-                ),
+                "First Name": self.find_visible(
+                    MyInfoLocators.FIRST_NAME_FIELD
+                ).get_attribute("value"),
+                "Middle Name": self.find_visible(
+                    MyInfoLocators.MIDDLE_NAME_FIELD
+                ).get_attribute("value"),
+                "Last Name": self.find_visible(
+                    MyInfoLocators.LAST_NAME_FIELD
+                ).get_attribute("value"),
                 "Employee Id": self.read_field_by_label("Employee Id"),
                 "Other Id": self.read_field_by_label("Other Id"),
                 "Driver's License Number": self.read_field_by_label(
@@ -178,7 +213,18 @@ class MyInfoPage(BasePage):
     def _handle_contact_details(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 2: Contact Details"""
+        """Process and scrape the Contact Details section.
+
+        Args:
+            data (Dict[str, Any]): Contact details to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped contact-detail rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_contact_details(data, pdf_path)
+        """
         self.open_sub_tab("Contact Details")
 
         self.fill_field_by_label("Street 1", data["street_1"])
@@ -215,14 +261,23 @@ class MyInfoPage(BasePage):
     def _handle_emergency_contacts(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 3: Emergency Contacts"""
+        """Process and scrape the Emergency Contacts section.
+
+        Args:
+            data (Dict[str, Any]): Emergency contact values to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped emergency-contact rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_emergency_contacts(data, pdf_path)
+        """
         self.open_sub_tab("Emergency Contacts")
 
-        add_btn = (
-            By.XPATH,
-            "//h6[normalize-space()='Assigned Emergency Contacts']/ancestor::div[contains(@class, 'orangehrm-action-header')]//button",
+        self.click_element(
+            MyInfoLocators.section_add_button("Assigned Emergency Contacts")
         )
-        self.click_element(add_btn)
 
         self.fill_field_by_label("Name", data["name"])
         self.fill_field_by_label("Relationship", data["relationship"])
@@ -249,14 +304,21 @@ class MyInfoPage(BasePage):
     def _handle_dependents(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 4: Dependents"""
+        """Process and scrape the Dependents section.
+
+        Args:
+            data (Dict[str, Any]): Dependent values to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped dependent rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_dependents(data, pdf_path)
+        """
         self.open_sub_tab("Dependents")
 
-        add_btn = (
-            By.XPATH,
-            "//h6[normalize-space()='Assigned Dependents']/ancestor::div[contains(@class, 'orangehrm-action-header')]//button",
-        )
-        self.click_element(add_btn)
+        self.click_element(MyInfoLocators.section_add_button("Assigned Dependents"))
 
         self.fill_field_by_label("Name", data["name"])
         self.select_dropdown_by_label("Relationship", data["relationship"])
@@ -278,14 +340,23 @@ class MyInfoPage(BasePage):
     def _handle_immigration(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 5: Immigration"""
+        """Process and scrape the Immigration section.
+
+        Args:
+            data (Dict[str, Any]): Immigration values to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped immigration rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_immigration(data, pdf_path)
+        """
         self.open_sub_tab("Immigration")
 
-        add_btn = (
-            By.XPATH,
-            "//h6[normalize-space()='Assigned Immigration Records']/ancestor::div[contains(@class, 'orangehrm-action-header')]//button",
+        self.click_element(
+            MyInfoLocators.section_add_button("Assigned Immigration Records")
         )
-        self.click_element(add_btn)
 
         self.fill_field_by_label("Number", data["number"])
         self.fill_field_by_label("Issued Date", data["issued_date"])
@@ -312,7 +383,17 @@ class MyInfoPage(BasePage):
     def _handle_job_section(
         self, attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 6: Job (Scrapes job details + uploads attachment if enabled)"""
+        """Scrape job details and upload an attachment when supported.
+
+        Args:
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped job rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_job_section(pdf_path)
+        """
         self.open_sub_tab("Job")
 
         # Upload attachment if the Attachments header is present on the Job tab
@@ -334,7 +415,17 @@ class MyInfoPage(BasePage):
     def _handle_salary_section(
         self, attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 7: Salary (Uploads Salary Slip attachment + scrapes components)"""
+        """Scrape salary components and upload an attachment.
+
+        Args:
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped salary rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_salary_section(pdf_path)
+        """
         self.open_sub_tab("Salary")
 
         self._try_upload_attachment(
@@ -357,7 +448,17 @@ class MyInfoPage(BasePage):
     def _handle_report_to_section(
         self, attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 8: Report-to (Uploads Hierarchy attachment + scrapes supervisors)"""
+        """Scrape reporting supervisors and upload an attachment.
+
+        Args:
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped supervisor rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_report_to_section(pdf_path)
+        """
         self.open_sub_tab("Report-to")
 
         self._try_upload_attachment(
@@ -373,14 +474,21 @@ class MyInfoPage(BasePage):
     def _handle_qualifications(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 9: Qualifications (Work Experience + PDF Attachment)"""
+        """Process and scrape the Qualifications section.
+
+        Args:
+            data (Dict[str, Any]): Work experience values to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped qualification rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_qualifications(data, pdf_path)
+        """
         self.open_sub_tab("Qualifications")
 
-        add_work_exp_btn = (
-            By.XPATH,
-            "//h6[normalize-space()='Work Experience']/ancestor::div[contains(@class, 'orangehrm-action-header')]//button",
-        )
-        self.click_element(add_work_exp_btn)
+        self.click_element(MyInfoLocators.section_add_button("Work Experience"))
 
         self.fill_field_by_label("Company", data["company"])
         self.fill_field_by_label("Job Title", data["job_title"])
@@ -405,14 +513,21 @@ class MyInfoPage(BasePage):
     def _handle_memberships(
         self, data: Dict[str, Any], attachment_file: Path
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Section 10: Memberships"""
+        """Process and scrape the Memberships section.
+
+        Args:
+            data (Dict[str, Any]): Membership values to enter.
+            attachment_file (Path): File to upload for the section.
+
+        Returns:
+            Tuple of scraped membership rows and attachment rows.
+
+        Example:
+            rows, attachments = page._handle_memberships(data, pdf_path)
+        """
         self.open_sub_tab("Memberships")
 
-        add_btn = (
-            By.XPATH,
-            "//h6[normalize-space()='Assigned Memberships']/ancestor::div[contains(@class, 'orangehrm-action-header')]//button",
-        )
-        self.click_element(add_btn)
+        self.click_element(MyInfoLocators.section_add_button("Assigned Memberships"))
 
         self.select_dropdown_by_label("Membership", index=2)
         self.select_dropdown_by_label(
@@ -445,11 +560,21 @@ class MyInfoPage(BasePage):
         return scraped, attachments
 
     def _try_upload_attachment(self, file_path: Path, comment: str) -> None:
-        """Uploads an attachment if the current tab has an '+ Add' button under Attachments."""
-        add_btn_xpath = "//h6[normalize-space()='Attachments']/ancestor::div[contains(@class, 'orangehrm-action-header')]//button"
+        """Upload an attachment when the current tab exposes the widget.
+
+        Args:
+            file_path (Path): File to upload.
+            comment (str): Description saved with the attachment.
+
+        Returns:
+            None.
+
+        Example:
+            page._try_upload_attachment(pdf_path, "Employment contract")
+        """
         try:
             WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located((By.XPATH, add_btn_xpath))
+                EC.presence_of_element_located(MyInfoLocators.attachment_add_button())
             )
             self.upload_attachment_in_current_section(file_path, comment)
         except TimeoutException:
@@ -461,20 +586,26 @@ class MyInfoPage(BasePage):
         self, header_title: str, columns: List[str]
     ) -> List[Dict[str, Any]]:
         """
-        Scrapes any OrangeHRM `oxd-table` positioned immediately below a given `h6` section header.
+        Scrape an OrangeHRM table positioned below a section header.
+
+        Args:
+            header_title (str): Visible heading above the table.
+            columns (List[str]): Output names for table columns.
+
+        Returns:
+            List of dictionaries containing scraped table records.
+
+        Example:
+            rows = page._scrape_generic_section_table("Work Experience", columns)
         """
         self.wait_for_Check_loaders()
-        rows_xpath = (
-            f"//h6[normalize-space()='{header_title}']"
-            f"/ancestor::div[contains(@class, 'orangehrm-action-header') or contains(@class, 'orangehrm-horizontal-padding')]"
-            f"/following-sibling::div[contains(@class, 'orangehrm-container')][1]"
-            f"//div[@class='oxd-table-body']//div[@role='row']"
+        rows = self.driver.find_elements(
+            *MyInfoLocators.generic_section_rows(header_title)
         )
-        rows = self.driver.find_elements(By.XPATH, rows_xpath)
         results: List[Dict[str, Any]] = []
 
         for row in rows:
-            cells = row.find_elements(By.XPATH, ".//div[@role='cell']")
+            cells = row.find_elements(*MyInfoLocators.ATTACHMENT_CELL)
             if len(cells) > 1:
                 record: Dict[str, Any] = {}
                 for i, col_name in enumerate(columns):

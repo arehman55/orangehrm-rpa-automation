@@ -7,12 +7,12 @@ or isolated Phase 4 Email Automation directly from the command line.
 import argparse
 import logging
 import sys
-from pathlib import Path
-from robot import run as robot_run
-from src.keywords.orangehrm_keywords import OrangeHRMKeywords
 
-# Yahan humne config se dynamic paths import kar liye hain
-from src.config import ROBOT_FILE, OUTPUT_DIR
+from robot import run as robot_run
+
+# Import the dynamically configured paths.
+from src.config import OUTPUT_DIR, ROBOT_FILE
+from src.keywords.orangehrm_keywords import OrangeHRMKeywords
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,10 +22,21 @@ logger = logging.getLogger("CentralizedRunner")
 
 
 def run_robot_suite() -> int:
-    """Initiates the complete automation suite via Robot Framework orchestrator."""
-    logger.info("Initiating Full RPA Suite via Robot Framework (%s)...", ROBOT_FILE.name)
-    
-    # FIX: Yahan direct ROBOT_FILE aur OUTPUT_DIR use kiya hai jo config.py se aayega
+    """Run the complete automation suite through Robot Framework.
+
+    Args:
+        None.
+
+    Returns:
+        int: Robot Framework process return code.
+
+    Example:
+        exit_code = run_robot_suite()
+    """
+    logger.info(
+        "Initiating Full RPA Suite via Robot Framework (%s)...", ROBOT_FILE.name
+    )
+
     return_code = robot_run(
         str(ROBOT_FILE),
         outputdir=str(OUTPUT_DIR),
@@ -35,7 +46,17 @@ def run_robot_suite() -> int:
 
 
 def run_pure_python_workflow(mode: str) -> None:
-    """Initiates the automation phases directly via Pure Python Keyword class."""
+    """Run the automation phases through the Python keyword library.
+
+    Args:
+        mode (str): Execution mode, including ``email-only``.
+
+    Returns:
+        None.
+
+    Example:
+        run_pure_python_workflow("email-only")
+    """
     rpa = OrangeHRMKeywords()
 
     if mode == "email-only":
@@ -57,7 +78,17 @@ def run_pure_python_workflow(mode: str) -> None:
 
 
 def main() -> None:
-    """Main CLI handler parsed when running `run-rpa` or `python -m src.cli`."""
+    """Parse command-line arguments and start the selected workflow.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+
+    Example:
+        main()
+    """
     parser = argparse.ArgumentParser(
         description="OrangeHRM Enterprise RPA Centralized Runner"
     )
@@ -79,7 +110,7 @@ def main() -> None:
             sys.exit(exit_code)
         else:
             run_pure_python_workflow(args.mode)
-    except Exception as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         logger.error("Execution failed: %s", exc)
         sys.exit(1)
 

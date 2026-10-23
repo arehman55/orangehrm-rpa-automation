@@ -8,31 +8,32 @@ Exports strictly 2 Excel workbooks:
 
 import logging
 from typing import Optional
+
 from robot.api.deco import keyword, library
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.chrome.options import Options
 
 from src.config import (
     BASE_URL,
-    USERNAME,
-    PASSWORD,
-    TIMESHEET_DATA,
     MY_INFO_SECTIONS_DATA,
-    SAMPLE_ATTACHMENT_PATH,
     OUTPUT_DIR,
+    PASSWORD,
+    SAMPLE_ATTACHMENT_PATH,
+    TIMESHEET_DATA,
+    USERNAME,
 )
 from src.excel_manager import ExcelManager
-from src.pages.login_page import LoginPage
-from src.pages.time_page import TimePage
-from src.pages.my_info_page import MyInfoPage
-from src.pages.thunderbird_mailer import ThunderbirdMailer
 from src.exceptions import (
     AuthenticationError,
-    TimesheetAutomationError,
-    MyInfoAutomationError,
     EmailAutomationError,
+    MyInfoAutomationError,
+    TimesheetAutomationError,
 )
+from src.pages.login_page import LoginPage
+from src.pages.my_info_page import MyInfoPage
+from src.pages.time_page import TimePage
+from src.pages.thunderbird_mailer import ThunderbirdMailer
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,32 @@ class OrangeHRMKeywords:
     """Enterprise Keyword Library for OrangeHRM End-to-End RPA."""
 
     def __init__(self) -> None:
+        """Initialize the keyword library without opening a browser.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            keywords = OrangeHRMKeywords()
+        """
         self.driver: Optional[webdriver.Chrome] = None
 
     @keyword("Initialize Browser Session")
     def initialize_browser_session(self, headless: bool = False) -> None:
-        """Initializes a configured Selenium 4 Chrome WebDriver instance."""
+        """Start a configured Selenium Chrome WebDriver session.
+
+        Args:
+            headless (bool): Whether to run Chrome without a visible window.
+
+        Returns:
+            None.
+
+        Example:
+            keywords.initialize_browser_session(headless=True)
+        """
         options = Options()
         if headless:
             options.add_argument("--headless=new")
@@ -61,7 +83,17 @@ class OrangeHRMKeywords:
 
     @keyword("Execute Phase 1 Authentication")
     def execute_phase_1_authentication(self) -> None:
-        """Executes Phase 1: Portal navigation, login, and Dashboard assertion."""
+        """Execute portal navigation, login, and dashboard validation.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            keywords.execute_phase_1_authentication()
+        """
         if not self.driver:
             raise RuntimeError("WebDriver is not initialized.")
         try:
@@ -70,15 +102,23 @@ class OrangeHRMKeywords:
         except AuthenticationError:
             self._capture_failure_state("phase1_auth_failure")
             raise
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError, WebDriverException) as exc:
             self._capture_failure_state("phase1_auth_failure")
             raise AuthenticationError(f"Phase 1 Authentication failed: {exc}") from exc
 
     @keyword("Execute Phase 2 Time Module Automation And Scraping")
     def execute_phase_2_time_module(self) -> None:
         """
-        Executes Phase 2: Navigates to My Timesheets, inputs 7 separate daily entries,
-        validates save state, scrapes grid, and saves to 'OrangeHRM_Data.xlsx' (Workbook 1).
+        Execute timesheet automation and export the resulting workbook.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            keywords.execute_phase_2_time_module()
         """
         if not self.driver:
             raise RuntimeError("WebDriver is not initialized.")
@@ -101,7 +141,7 @@ class OrangeHRMKeywords:
         except TimesheetAutomationError:
             self._capture_failure_state("phase2_time_failure")
             raise
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError, WebDriverException) as exc:
             self._capture_failure_state("phase2_time_failure")
             raise TimesheetAutomationError(
                 f"Phase 2 Time Module failed: {exc}"
@@ -110,9 +150,16 @@ class OrangeHRMKeywords:
     @keyword("Execute Phase 3 My Info Automation And Scraping")
     def execute_phase_3_my_info_module(self) -> None:
         """
-        Executes Phase 3: Iterates through all 10 My Info sections, injects dummy data,
-        uploads sample_attachment.pdf, and writes 10 worksheets into 'Details.xlsx' (Workbook 2),
-        where each worksheet contains both the section's data AND its Attachments table with PDF hyperlinks.
+        Execute My Info automation and export the details workbook.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            keywords.execute_phase_3_my_info_module()
         """
         if not self.driver:
             raise RuntimeError("WebDriver is not initialized.")
@@ -164,7 +211,7 @@ class OrangeHRMKeywords:
         except MyInfoAutomationError:
             self._capture_failure_state("phase3_my_info_failure")
             raise
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             self._capture_failure_state("phase3_my_info_failure")
             raise MyInfoAutomationError(
                 f"Phase 3 My Info Module failed: {exc}"
@@ -173,8 +220,16 @@ class OrangeHRMKeywords:
     @keyword("Execute Phase 4 Email Reporting Via Thunderbird")
     def execute_phase_4_email_reporting(self) -> None:
         """
-        Executes Phase 4: Dispatches Email 1 (Simple black-and-white HTML table + OrangeHRM_Data.xlsx)
-        and Email 2 (Threaded Reply with Details.xlsx) via cross-platform Thunderbird logic.
+        Send the timesheet report and details reply through Thunderbird.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            keywords.execute_phase_4_email_reporting()
         """
         try:
             mailer = ThunderbirdMailer()
@@ -185,14 +240,24 @@ class OrangeHRMKeywords:
             mailer.send_reply_with_details_excel(details_excel)
         except EmailAutomationError:
             raise
-        except Exception as exc:
+        except (OSError, RuntimeError, ValueError) as exc:
             raise EmailAutomationError(
                 f"Phase 4 Thunderbird Email Reporting failed: {exc}"
             ) from exc
 
     @keyword("Close Browser Safely")
     def close_browser_safely(self) -> None:
-        """Safely terminates the WebDriver session during Suite Teardown."""
+        """Close the WebDriver session during suite teardown.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Example:
+            keywords.close_browser_safely()
+        """
         if self.driver:
             try:
                 self.driver.quit()
@@ -203,11 +268,25 @@ class OrangeHRMKeywords:
                 self.driver = None
 
     def _capture_failure_state(self, prefix: str) -> None:
-        """Captures a diagnostic screenshot into the output folder upon unexpected exception."""
+        """Save a diagnostic screenshot after a workflow failure.
+
+        Args:
+            prefix (str): Prefix for the screenshot filename.
+
+        Returns:
+            None.
+
+        Example:
+            keywords._capture_failure_state("phase1_failure")
+        """
         if self.driver:
             screenshot_path = OUTPUT_DIR / f"{prefix}.png"
             try:
                 self.driver.save_screenshot(str(screenshot_path))
                 logger.error("Saved diagnostic screenshot to %s", screenshot_path)
-            except WebDriverException:
-                pass
+            except WebDriverException as exc:
+                logger.warning(
+                    "Could not save diagnostic screenshot to %s: %s",
+                    screenshot_path,
+                    exc,
+                )

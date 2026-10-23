@@ -21,10 +21,10 @@ dependencies = [
 ]
 
 [project.scripts]
-# Centralized CLI commands jo package install hone ke baad terminal mein direct chalengi
+# Centralized CLI commands available after package installation.
 run-rpa = "src.cli:main"
 
 [tool.setuptools]
-# Hum src directory ko package ke taur par register kar rahe hain taake existing imports (src.pages...) break na hon
+# Register the src packages so existing imports (src.pages...) continue to work.
 packages = ["src", "src.pages", "src.keywords"]
 include-package-data = true

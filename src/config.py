@@ -6,14 +6,14 @@ Separates test data and environment constants from page logic.
 import os
 from pathlib import Path
 
-# FIX: Sirf ek dafa .parent likhna hai taake path 'src' ke andar hi rahe
+# Use one parent directory so the path remains inside 'src'.
 BASE_DIR = Path(__file__).resolve().parent
 
-# Ab robot file aur devdata sahi jagah point karenge
+# Point the Robot Framework file and development data to their correct locations.
 ROBOT_FILE = BASE_DIR / "tasks.robot"
 DEVDATA_DIR = BASE_DIR / "devdata"
 
-# Output folder user ke current terminal mein banega
+# Create the output folder in the user's current working directory.
 OUTPUT_DIR = Path.cwd() / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -27,10 +27,10 @@ PRIMARY_EXCEL_PATH = OUTPUT_DIR / "OrangeHRM_Data.xlsx"
 ATTACHMENTS_EXCEL_PATH = OUTPUT_DIR / "OrangeHRM_Attachments.xlsx"
 SAMPLE_ATTACHMENT_PATH = DEVDATA_DIR / "sample_attachment.pdf"
 
-# Fallback: if sample_attachment.pdf is missing, create a valid dummy PDF
+# Require the configured attachment fixture instead of creating substitute data.
 if not SAMPLE_ATTACHMENT_PATH.exists():
-    SAMPLE_ATTACHMENT_PATH.write_bytes(
-        b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF"
+    raise FileNotFoundError(
+        f"Required attachment fixture not found: {SAMPLE_ATTACHMENT_PATH}"
     )
 
 # Phase 2: Timesheet Dummy Data
