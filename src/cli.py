@@ -67,14 +67,14 @@ def run_pure_python_workflow(mode: str) -> None:
 
     logger.info("Initiating Complete 4-Phase Pure Python Execution...")
     try:
-        rpa.initialize_automation_session()
+        rpa.initialize_browser_session()
         rpa.execute_phase_1_authentication()
-        rpa.execute_phase_2_time_module_automation()
-        rpa.execute_phase_3_my_info_module_automation()
+        rpa.execute_phase_2_time_module()
+        rpa.execute_phase_3_my_info_module()
         rpa.execute_phase_4_email_reporting()
         logger.info("All 4 Phases completed successfully!")
     finally:
-        rpa.teardown_automation_session()
+        rpa.close_browser_safely()
 
 
 def main() -> None:
