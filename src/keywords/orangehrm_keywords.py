@@ -6,8 +6,9 @@ Exports strictly 2 Excel workbooks:
 2. Details.xlsx (10 My Info Worksheets, each with its own Attachments section & PDF hyperlinks)
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Optional
 
 from robot.api.deco import keyword, library
 from selenium import webdriver
@@ -16,13 +17,16 @@ from selenium.webdriver.chrome.options import Options
 
 from src.config import (
     BASE_URL,
+    MY_INFO_SECTIONS,
     MY_INFO_SECTIONS_DATA,
     OUTPUT_DIR,
     PASSWORD,
     SAMPLE_ATTACHMENT_PATH,
     TIMESHEET_DATA,
     USERNAME,
+    format_my_info_section_label,
 )
+from src.decorators import requires_driver
 from src.excel_manager import ExcelManager
 from src.exceptions import (
     AuthenticationError,
@@ -32,8 +36,8 @@ from src.exceptions import (
 )
 from src.pages.login_page import LoginPage
 from src.pages.my_info_page import MyInfoPage
+from src.services.thunderbird_mailer import ThunderbirdMailer
 from src.pages.time_page import TimePage
-from src.pages.thunderbird_mailer import ThunderbirdMailer
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +58,7 @@ class OrangeHRMKeywords:
         Example:
             keywords = OrangeHRMKeywords()
         """
-        self.driver: Optional[webdriver.Chrome] = None
+        self.driver: webdriver.Chrome | None = None
 
     @keyword("Initialize Browser Session")
     def initialize_browser_session(self, headless: bool = False) -> None:
@@ -72,9 +76,6 @@ class OrangeHRMKeywords:
         options = Options()
         if headless:
             options.add_argument("--headless=new")
-        options.add_argument("--start-maximized")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--window-size=1920,1080")
 
@@ -82,20 +83,8 @@ class OrangeHRMKeywords:
         logger.info("Chrome WebDriver session initialized successfully.")
 
     @keyword("Execute Phase 1 Authentication")
+    @requires_driver
     def execute_phase_1_authentication(self) -> None:
-        """Execute portal navigation, login, and dashboard validation.
-
-        Args:
-            None.
-
-        Returns:
-            None.
-
-        Example:
-            keywords.execute_phase_1_authentication()
-        """
-        if not self.driver:
-            raise RuntimeError("WebDriver is not initialized.")
         try:
             login_page = LoginPage(self.driver)
             login_page.login(BASE_URL, USERNAME, PASSWORD)
@@ -107,6 +96,7 @@ class OrangeHRMKeywords:
             raise AuthenticationError(f"Phase 1 Authentication failed: {exc}") from exc
 
     @keyword("Execute Phase 2 Time Module Automation And Scraping")
+    @requires_driver
     def execute_phase_2_time_module(self) -> None:
         """
         Execute timesheet automation and export the resulting workbook.
@@ -120,8 +110,6 @@ class OrangeHRMKeywords:
         Example:
             keywords.execute_phase_2_time_module()
         """
-        if not self.driver:
-            raise RuntimeError("WebDriver is not initialized.")
         try:
             time_page = TimePage(self.driver)
             time_page.navigate_to_my_timesheets()
@@ -148,6 +136,7 @@ class OrangeHRMKeywords:
             ) from exc
 
     @keyword("Execute Phase 3 My Info Automation And Scraping")
+    @requires_driver
     def execute_phase_3_my_info_module(self) -> None:
         """
         Execute My Info automation and export the details workbook.
@@ -161,8 +150,6 @@ class OrangeHRMKeywords:
         Example:
             keywords.execute_phase_3_my_info_module()
         """
-        if not self.driver:
-            raise RuntimeError("WebDriver is not initialized.")
         try:
             my_info_page = MyInfoPage(self.driver)
             sections_map, attachments_by_section = (
@@ -181,18 +168,9 @@ class OrangeHRMKeywords:
             if legacy_attachments_path.exists():
                 legacy_attachments_path.unlink()
 
-            # Map each of the 10 sheet names to its corresponding attachment dictionary key
             section_to_attachment_key = {
-                "Personal_Details": "1. Personal Details",
-                "Contact_Details": "2. Contact Details",
-                "Emergency_Contacts": "3. Emergency Contacts",
-                "Dependents": "4. Dependents",
-                "Immigration": "5. Immigration",
-                "Job": "6. Job",
-                "Salary": "7. Salary",
-                "Report_To": "8. Report-to",
-                "Qualifications": "9. Qualifications",
-                "Memberships": "10. Memberships",
+                section_name: format_my_info_section_label(section_name, position)
+                for position, section_name in enumerate(MY_INFO_SECTIONS, start=1)
             }
 
             # Workbook 2: Details.xlsx (10 Worksheets, each with Section Data + Attachments + Hyperlink)
@@ -211,7 +189,7 @@ class OrangeHRMKeywords:
         except MyInfoAutomationError:
             self._capture_failure_state("phase3_my_info_failure")
             raise
-        except (OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError, WebDriverException) as exc:
             self._capture_failure_state("phase3_my_info_failure")
             raise MyInfoAutomationError(
                 f"Phase 3 My Info Module failed: {exc}"

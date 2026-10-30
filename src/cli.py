@@ -11,13 +11,10 @@ import sys
 from robot import run as robot_run
 
 # Import the dynamically configured paths.
-from src.config import OUTPUT_DIR, ROBOT_FILE
+from src import config
+from src.exceptions import OrangeHRMBaseException
 from src.keywords.orangehrm_keywords import OrangeHRMKeywords
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
 logger = logging.getLogger("CentralizedRunner")
 
 
@@ -34,13 +31,13 @@ def run_robot_suite() -> int:
         exit_code = run_robot_suite()
     """
     logger.info(
-        "Initiating Full RPA Suite via Robot Framework (%s)...", ROBOT_FILE.name
+        "Initiating Full RPA Suite via Robot Framework (%s)...", config.ROBOT_FILE.name
     )
 
     return_code = robot_run(
-        str(ROBOT_FILE),
-        outputdir=str(OUTPUT_DIR),
-        pythonpath=[str(ROBOT_FILE.parent)],
+        str(config.ROBOT_FILE),
+        outputdir=str(config.OUTPUT_DIR),
+        pythonpath=[str(config.ROBOT_FILE.parent)],
     )
     return int(return_code)
 
@@ -89,6 +86,11 @@ def main() -> None:
     Example:
         main()
     """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    )
+
     parser = argparse.ArgumentParser(
         description="OrangeHRM Enterprise RPA Centralized Runner"
     )
@@ -105,13 +107,14 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
+        config.validate_environment()
         if args.mode == "robot":
             exit_code = run_robot_suite()
             sys.exit(exit_code)
         else:
             run_pure_python_workflow(args.mode)
-    except (OSError, RuntimeError, ValueError) as exc:
-        logger.error("Execution failed: %s", exc)
+    except (OSError, RuntimeError, ValueError, OrangeHRMBaseException) as exc:
+        print(f"Execution failed: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

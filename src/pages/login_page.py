@@ -4,6 +4,7 @@ Handles portal login and dashboard verification with custom exceptions.
 """
 
 import logging
+
 from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -39,7 +40,7 @@ class LoginPage(BasePage):
         """
         logger.info("Navigating to login portal: %s", base_url)
         self.driver.get(base_url)
-        self.wait_for_Check_loaders()
+        self.wait_for_loaders()
 
         try:
             logger.info("Entering credentials...")

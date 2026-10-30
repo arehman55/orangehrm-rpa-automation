@@ -26,5 +26,11 @@ run-rpa = "src.cli:main"
 
 [tool.setuptools]
 # Register the src packages so existing imports (src.pages...) continue to work.
-packages = ["src", "src.pages", "src.keywords"]
+packages = [
+    "src",
+    "src.pages",
+    "src.keywords",
+    "src.mixins",
+    "src.services",
+]
 include-package-data = true

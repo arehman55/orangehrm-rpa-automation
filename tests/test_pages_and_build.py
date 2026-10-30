@@ -10,17 +10,18 @@ from unittest.mock import Mock, patch
 
 import build_script
 from selenium.common.exceptions import TimeoutException, WebDriverException
+from src import config
 from src.base_page import BasePage
 from src.pages.locators import MyInfoLocators
 from src.pages.my_info_page import MyInfoPage
-from src.pages.thunderbird_mailer import ThunderbirdMailer
+from src.services.thunderbird_mailer import ThunderbirdMailer
 
 
 class MyInfoPageTests(unittest.TestCase):
     def setUp(self) -> None:
         self.page = MyInfoPage.__new__(MyInfoPage)
         self.page.click_element = Mock()
-        self.page.wait_for_Check_loaders = Mock()
+        self.page.wait_for_loaders = Mock()
 
     def test_open_sub_tab_uses_external_locator(self) -> None:
         self.page.open_sub_tab("Personal Details")
@@ -28,7 +29,7 @@ class MyInfoPageTests(unittest.TestCase):
         self.page.click_element.assert_called_once_with(
             MyInfoLocators.tab_link("Personal Details")
         )
-        self.page.wait_for_Check_loaders.assert_called_once_with()
+        self.page.wait_for_loaders.assert_called_once_with()
 
     def test_xpath_literal_supports_apostrophes(self) -> None:
         locator = MyInfoLocators.tab_link("Driver's License")
@@ -64,19 +65,21 @@ class BasePageTests(unittest.TestCase):
     def test_loader_wait_uses_only_configured_explicit_wait(self) -> None:
         page = BasePage.__new__(BasePage)
         page.wait = Mock()
-        page.wait_for_Check_loaders()
+        page.wait_for_loaders()
 
         self.assertEqual(page.wait.until.call_count, 2)
 
-    def test_download_attachment_returns_no_attachment_after_timeout(self) -> None:
+    def test_capture_attachment_returns_no_attachment_after_timeout(self) -> None:
         page = BasePage.__new__(BasePage)
         page.driver = Mock()
-        page.wait_for_Check_loaders = Mock()
+        page.wait_for_loaders = Mock()
 
-        with patch("src.base_page.WebDriverWait") as wait_class:
+        with patch("src.mixins.attachment_mixin.WebDriverWait") as wait_class:
             wait_class.return_value.until.side_effect = TimeoutException()
-            with self.assertLogs("src.base_page", level="WARNING") as logs:
-                result = page.download_attachment_from_current_section("Job")
+            with self.assertLogs(
+                "src.mixins.attachment_mixin", level="WARNING"
+            ) as logs:
+                result = page.capture_attachment_metadata_from_current_section("Job")
 
         self.assertEqual(result["Download_Status"], "No Attachment Found")
         self.assertTrue(
@@ -88,17 +91,17 @@ class BasePageTests(unittest.TestCase):
         )
         self.assertIn("timed out", logs.output[0])
 
-    def test_download_attachment_logs_webdriver_failure(self) -> None:
+    def test_capture_attachment_logs_webdriver_failure(self) -> None:
         page = BasePage.__new__(BasePage)
         page.driver = Mock()
-        page.wait_for_Check_loaders = Mock()
+        page.wait_for_loaders = Mock()
 
-        with patch("src.base_page.WebDriverWait") as wait_class:
+        with patch("src.mixins.attachment_mixin.WebDriverWait") as wait_class:
             wait_class.return_value.until.side_effect = WebDriverException(
                 "driver offline"
             )
-            with self.assertLogs("src.base_page", level="ERROR") as logs:
-                result = page.download_attachment_from_current_section("Job")
+            with self.assertLogs("src.mixins.attachment_mixin", level="ERROR") as logs:
+                result = page.capture_attachment_metadata_from_current_section("Job")
 
         self.assertEqual(result["Download_Status"], "No Attachment Found")
         self.assertIn("driver offline", logs.output[0])
@@ -134,6 +137,7 @@ class BuildScriptTests(unittest.TestCase):
 
 class ThunderbirdMailerTests(unittest.TestCase):
     def test_details_attachment_uses_absolute_filesystem_path(self) -> None:
+        config.validate_environment()
         mailer = ThunderbirdMailer.__new__(ThunderbirdMailer)
         mailer._build_details_reply_html = Mock(return_value="<p>Details</p>")
         mailer._compose_and_dispatch = Mock()
@@ -167,8 +171,7 @@ class ThunderbirdMailerTests(unittest.TestCase):
                 },
                 clear=False,
             ),
-            patch("src.pages.thunderbird_mailer.subprocess.Popen") as popen,
-            patch("src.pages.thunderbird_mailer.time.sleep") as sleep,
+            patch("src.services.thunderbird_mailer.subprocess.Popen") as popen,
         ):
             mailer._compose_and_dispatch("to='test@example.com'")
 
@@ -179,7 +182,16 @@ class ThunderbirdMailerTests(unittest.TestCase):
         self.assertNotIn("PYTHONHOME", child_environment)
         self.assertNotIn("GIO_MODULE_DIR", child_environment)
         self.assertNotIn("GTK_PATH", child_environment)
-        sleep.assert_called_once_with(5)
+        mailer.desktop.wait_for_element.assert_called_once_with(
+            "title:Write:", timeout=20
+        )
+        mailer.desktop.click.assert_has_calls(
+            [
+                unittest.mock.call("title:Write:"),
+                unittest.mock.call("name:Send"),
+            ]
+        )
+        mailer.desktop.press_keys.assert_not_called()
         popen.assert_called_once_with(
             ["thunderbird", "-compose", "to='test@example.com'"],
             env=child_environment,

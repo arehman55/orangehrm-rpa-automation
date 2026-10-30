@@ -5,11 +5,7 @@ Automates data entry, PDF attachment uploads, save validations, and scraping acr
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
-
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from typing import Any
 
 from src.base_page import BasePage
 from src.pages.locators import MyInfoLocators
@@ -37,7 +33,7 @@ class MyInfoPage(BasePage):
 
         logger.info("Navigating to My Info module...")
         self.navigate_sidebar("My Info")
-        self.wait_for_Check_loaders()
+        self.wait_for_loaders()
 
     def open_sub_tab(self, tab_name: str) -> None:
         """Click a tab inside the My Info module.
@@ -53,13 +49,13 @@ class MyInfoPage(BasePage):
         """
         logger.info("Switching to My Info section: [%s]", tab_name)
         self.click_element(MyInfoLocators.tab_link(tab_name))
-        self.wait_for_Check_loaders()
+        self.wait_for_loaders()
 
     def process_all_ten_sections(
         self,
-        sections_data: Dict[str, Dict[str, Any]],
+        sections_data: dict[str, dict[str, Any]],
         attachment_file: Path,
-    ) -> Tuple[Dict[str, List[Dict[str, Any]]], Dict[str, List[Dict[str, Any]]]]:
+    ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[dict[str, Any]]]]:
         """
         Process, validate, and scrape all ten My Info sections.
 
@@ -75,8 +71,8 @@ class MyInfoPage(BasePage):
         """
         self.navigate_to_my_info()
 
-        all_sections_scraped: Dict[str, List[Dict[str, Any]]] = {}
-        all_attachments_by_section: Dict[str, List[Dict[str, Any]]] = {}
+        all_sections_scraped: dict[str, list[dict[str, Any]]] = {}
+        all_attachments_by_section: dict[str, list[dict[str, Any]]] = {}
 
         # 1. Personal Details
         sec_1, att_1 = self._handle_personal_details(
@@ -149,8 +145,8 @@ class MyInfoPage(BasePage):
     # -------------------------------------------------------------------------
 
     def _handle_personal_details(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Personal Details section.
 
         Args:
@@ -177,7 +173,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Date of Birth", data["dob"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Personal Details - Official ID Document"
@@ -206,13 +202,13 @@ class MyInfoPage(BasePage):
             }
         ]
         attachments = [
-            self.download_attachment_from_current_section("Personal Details")
+            self.capture_attachment_metadata_from_current_section("Personal Details")
         ]
         return scraped, attachments
 
     def _handle_contact_details(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Contact Details section.
 
         Args:
@@ -237,7 +233,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Work Email", data["work_email"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Contact Details - Residence Verification PDF"
@@ -255,12 +251,14 @@ class MyInfoPage(BasePage):
                 "Work Email": self.read_field_by_label("Work Email"),
             }
         ]
-        attachments = [self.download_attachment_from_current_section("Contact Details")]
+        attachments = [
+            self.capture_attachment_metadata_from_current_section("Contact Details")
+        ]
         return scraped, attachments
 
     def _handle_emergency_contacts(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Emergency Contacts section.
 
         Args:
@@ -286,7 +284,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Work Telephone", data["work_telephone"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Emergency Contacts - Consent PDF"
@@ -297,13 +295,13 @@ class MyInfoPage(BasePage):
             ["Name", "Relationship", "Home Telephone", "Mobile", "Work Telephone"],
         )
         attachments = [
-            self.download_attachment_from_current_section("Emergency Contacts")
+            self.capture_attachment_metadata_from_current_section("Emergency Contacts")
         ]
         return scraped, attachments
 
     def _handle_dependents(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Dependents section.
 
         Args:
@@ -325,7 +323,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Date of Birth", data["dob"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Dependents - Birth Certificate PDF"
@@ -334,12 +332,14 @@ class MyInfoPage(BasePage):
         scraped = self._scrape_generic_section_table(
             "Assigned Dependents", ["Name", "Relationship", "Date of Birth"]
         )
-        attachments = [self.download_attachment_from_current_section("Dependents")]
+        attachments = [
+            self.capture_attachment_metadata_from_current_section("Dependents")
+        ]
         return scraped, attachments
 
     def _handle_immigration(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Immigration section.
 
         Args:
@@ -367,7 +367,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Comments", data["comments"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Immigration - Scanned Passport PDF"
@@ -377,12 +377,14 @@ class MyInfoPage(BasePage):
             "Assigned Immigration Records",
             ["Document", "Number", "Issued By", "Issued Date", "Expiry Date"],
         )
-        attachments = [self.download_attachment_from_current_section("Immigration")]
+        attachments = [
+            self.capture_attachment_metadata_from_current_section("Immigration")
+        ]
         return scraped, attachments
 
     def _handle_job_section(
         self, attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Scrape job details and upload an attachment when supported.
 
         Args:
@@ -409,12 +411,12 @@ class MyInfoPage(BasePage):
                 "Employment Status": self.read_dropdown_by_label("Employment Status"),
             }
         ]
-        attachments = [self.download_attachment_from_current_section("Job")]
+        attachments = [self.capture_attachment_metadata_from_current_section("Job")]
         return scraped, attachments
 
     def _handle_salary_section(
         self, attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Scrape salary components and upload an attachment.
 
         Args:
@@ -442,12 +444,12 @@ class MyInfoPage(BasePage):
                 "Direct Deposit Amount",
             ],
         )
-        attachments = [self.download_attachment_from_current_section("Salary")]
+        attachments = [self.capture_attachment_metadata_from_current_section("Salary")]
         return scraped, attachments
 
     def _handle_report_to_section(
         self, attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Scrape reporting supervisors and upload an attachment.
 
         Args:
@@ -468,12 +470,14 @@ class MyInfoPage(BasePage):
         supervisors = self._scrape_generic_section_table(
             "Assigned Supervisors", ["Name", "Reporting Method"]
         )
-        attachments = [self.download_attachment_from_current_section("Report-to")]
+        attachments = [
+            self.capture_attachment_metadata_from_current_section("Report-to")
+        ]
         return supervisors, attachments
 
     def _handle_qualifications(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Qualifications section.
 
         Args:
@@ -497,7 +501,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Comment", data["comment"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Qualifications - Experience Certificate PDF"
@@ -507,12 +511,14 @@ class MyInfoPage(BasePage):
             "Work Experience",
             ["Company", "Job Title", "From", "To", "Comment"],
         )
-        attachments = [self.download_attachment_from_current_section("Qualifications")]
+        attachments = [
+            self.capture_attachment_metadata_from_current_section("Qualifications")
+        ]
         return scraped, attachments
 
     def _handle_memberships(
-        self, data: Dict[str, Any], attachment_file: Path
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, data: dict[str, Any], attachment_file: Path
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Process and scrape the Memberships section.
 
         Args:
@@ -539,7 +545,7 @@ class MyInfoPage(BasePage):
         self.fill_field_by_label("Subscription Renewal Date", data["renewal_date"])
 
         self.click_element(self.PRIMARY_SAVE_BTN)
-        self.validate_success_toast()
+        self.wait_for_success_toast()
 
         self.upload_attachment_in_current_section(
             attachment_file, "Memberships - Subscription Receipt PDF"
@@ -556,35 +562,14 @@ class MyInfoPage(BasePage):
                 "Subscription Renewal Date",
             ],
         )
-        attachments = [self.download_attachment_from_current_section("Memberships")]
+        attachments = [
+            self.capture_attachment_metadata_from_current_section("Memberships")
+        ]
         return scraped, attachments
 
-    def _try_upload_attachment(self, file_path: Path, comment: str) -> None:
-        """Upload an attachment when the current tab exposes the widget.
-
-        Args:
-            file_path (Path): File to upload.
-            comment (str): Description saved with the attachment.
-
-        Returns:
-            None.
-
-        Example:
-            page._try_upload_attachment(pdf_path, "Employment contract")
-        """
-        try:
-            WebDriverWait(self.driver, 3).until(
-                EC.presence_of_element_located(MyInfoLocators.attachment_add_button())
-            )
-            self.upload_attachment_in_current_section(file_path, comment)
-        except TimeoutException:
-            logger.info(
-                "No editable Attachment widget on this read-only tab; skipping upload."
-            )
-
     def _scrape_generic_section_table(
-        self, header_title: str, columns: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, header_title: str, columns: list[str]
+    ) -> list[dict[str, Any]]:
         """
         Scrape an OrangeHRM table positioned below a section header.
 
@@ -598,16 +583,16 @@ class MyInfoPage(BasePage):
         Example:
             rows = page._scrape_generic_section_table("Work Experience", columns)
         """
-        self.wait_for_Check_loaders()
+        self.wait_for_loaders()
         rows = self.driver.find_elements(
             *MyInfoLocators.generic_section_rows(header_title)
         )
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         for row in rows:
             cells = row.find_elements(*MyInfoLocators.ATTACHMENT_CELL)
             if len(cells) > 1:
-                record: Dict[str, Any] = {}
+                record: dict[str, Any] = {}
                 for i, col_name in enumerate(columns):
                     cell_idx = i + 1
                     record[col_name] = (

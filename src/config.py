@@ -13,25 +13,50 @@ BASE_DIR = Path(__file__).resolve().parent
 ROBOT_FILE = BASE_DIR / "tasks.robot"
 DEVDATA_DIR = BASE_DIR / "devdata"
 
-# Create the output folder in the user's current working directory.
-OUTPUT_DIR = Path.cwd() / "output"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+# Keep generated files alongside the project configuration.
+OUTPUT_DIR = BASE_DIR / "output"
 
 # Portal Credentials & URLs
 BASE_URL = "https://opensource-demo.orangehrmlive.com/web/index.php/auth/login"
 USERNAME = os.getenv("ORANGEHRM_USER", "Admin")
-PASSWORD = os.getenv("ORANGEHRM_PASS", "admin123")
+PASSWORD = os.getenv("ORANGEHRM_PASSWORD")
+if not PASSWORD:
+    raise ValueError("Password not set in environment.")
 
 # Excel Output Paths
 PRIMARY_EXCEL_PATH = OUTPUT_DIR / "OrangeHRM_Data.xlsx"
 ATTACHMENTS_EXCEL_PATH = OUTPUT_DIR / "OrangeHRM_Attachments.xlsx"
 SAMPLE_ATTACHMENT_PATH = DEVDATA_DIR / "sample_attachment.pdf"
 
-# Require the configured attachment fixture instead of creating substitute data.
-if not SAMPLE_ATTACHMENT_PATH.exists():
-    raise FileNotFoundError(
-        f"Required attachment fixture not found: {SAMPLE_ATTACHMENT_PATH}"
-    )
+
+def validate_environment() -> None:
+    """Create required directories and validate configured project fixtures."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if not SAMPLE_ATTACHMENT_PATH.exists():
+        raise FileNotFoundError(
+            f"Required attachment fixture not found: {SAMPLE_ATTACHMENT_PATH}"
+        )
+
+
+MY_INFO_SECTIONS = (
+    "Personal_Details",
+    "Contact_Details",
+    "Emergency_Contacts",
+    "Dependents",
+    "Immigration",
+    "Job",
+    "Salary",
+    "Report_To",
+    "Qualifications",
+    "Memberships",
+)
+
+
+def format_my_info_section_label(section_name: str, position: int) -> str:
+    """Return the numbered display label for a My Info section."""
+    display_name = section_name.replace("_", " ").replace("Report To", "Report-to")
+    return f"{position}. {display_name}"
+
 
 # Phase 2: Timesheet Dummy Data
 TIMESHEET_DATA = {
@@ -126,7 +151,8 @@ MY_INFO_SECTIONS_DATA = {
 # ==============================================================================
 # PHASE 4: THUNDERBIRD EMAIL AUTOMATION CONFIGURATION
 # ==============================================================================
-TEAM_LEAD_EMAIL = "fa22-bcs-260@students.cuisahiwal.edu.pk"
+TEAM_LEAD_EMAIL = os.getenv("TEAM_LEAD_EMAIL", "lead@example.com")
+AUTOMATION_AUTHOR = os.getenv("AUTOMATION_AUTHOR", "Automation Bot")
 EMAIL_1_SUBJECT = "OrangeHRM RPA Report: Weekly Timesheet Automation Summary"
 
 # Standard Windows installation paths for Mozilla Thunderbird

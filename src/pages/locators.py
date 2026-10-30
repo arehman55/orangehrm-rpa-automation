@@ -15,6 +15,10 @@ class BaseLocators:
         By.XPATH,
         "//div[contains(@class, 'oxd-toast')]//*[contains(text(), 'Success') or contains(text(), 'Successfully') or contains(text(), 'Saved')]",
     )
+    INPUT_ERROR: Locator = (
+        By.CSS_SELECTOR,
+        "span.oxd-input-field-error-message",
+    )
     ATTACHMENT_ROWS: Locator = (
         By.XPATH,
         "//div[contains(@class, 'orangehrm-container')]//div[@class='oxd-table-body']//div[@role='row']",

@@ -5,9 +5,11 @@ Creates two workbooks:
 2. Details.xlsx (10 My Info Worksheets, each containing its section data + Attachments table with PDF hyperlinks)
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 from openpyxl import Workbook, load_workbook
@@ -48,7 +50,7 @@ class ExcelManager:
 
     @classmethod
     def save_to_sheet(
-        cls, file_path: Path, sheet_name: str, data: List[Dict[str, Any]]
+        cls, file_path: Path, sheet_name: str, data: list[dict[str, Any]]
     ) -> None:
         """
         Write records to an Excel sheet and apply table styling.
@@ -106,9 +108,9 @@ class ExcelManager:
         cls,
         file_path: Path,
         sheet_name: str,
-        section_data: List[Dict[str, Any]],
-        attachments_data: List[Dict[str, Any]],
-        pdf_path: Optional[Path] = None,
+        section_data: list[dict[str, Any]],
+        attachments_data: list[dict[str, Any]],
+        pdf_path: Path | None = None,
     ) -> None:
         """
         Write section data and an attachments block to one worksheet.

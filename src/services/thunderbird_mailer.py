@@ -1,28 +1,36 @@
 """
 Phase 4: Mozilla Thunderbird Desktop Email Automation Page Object Model.
-Uses Pure Python, cross-platform RPA.Desktop (keyboard shortcuts),
+Uses Pure Python and cross-platform RPA.Desktop UI locators,
 CLI compose commands, and OS detection for Windows & Ubuntu compatibility.
 """
 
+import html
 import logging
 import os
 import platform
 import subprocess
-import time
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 from RPA.Desktop import Desktop
 
-from src.config import EMAIL_1_SUBJECT, OUTPUT_DIR, TEAM_LEAD_EMAIL, THUNDERBIRD_PATHS
+from src.config import (
+    AUTOMATION_AUTHOR,
+    EMAIL_1_SUBJECT,
+    MY_INFO_SECTIONS,
+    OUTPUT_DIR,
+    TEAM_LEAD_EMAIL,
+    THUNDERBIRD_PATHS,
+    format_my_info_section_label,
+)
 from src.exceptions import EmailAutomationError
 
 logger = logging.getLogger(__name__)
 
 
 class ThunderbirdMailer:
-    """Page Object for automating Mozilla Thunderbird using cross-platform CLI and Keyboard shortcuts."""
+    """Service for automating Mozilla Thunderbird with explicit UI locators."""
 
     def __init__(self, timeout: int = 20) -> None:
         """Initialize the desktop adapter and Thunderbird executable.
@@ -93,14 +101,15 @@ class ThunderbirdMailer:
 
         html_body = self._build_timesheet_html(records)
 
-        # FIX: Using OUTPUT_DIR instead of tempfile
         temp_html = OUTPUT_DIR / "orangehrm_email1_body.html"
         temp_html.write_text(html_body, encoding="utf-8")
 
         attachment_path = os.path.abspath(timesheet_excel_path)
+        safe_team_lead_email = TEAM_LEAD_EMAIL.replace("'", "")
+        safe_subject = EMAIL_1_SUBJECT.replace("'", "")
         compose_arg = (
-            f"to='{TEAM_LEAD_EMAIL}',"
-            f"subject='{EMAIL_1_SUBJECT}',"
+            f"to='{safe_team_lead_email}',"
+            f"subject='{safe_subject}',"
             f"format='html',"
             f"message='{temp_html.resolve()}',"
             f"attachment='{attachment_path}'"
@@ -108,7 +117,7 @@ class ThunderbirdMailer:
 
         logger.info("Launching Thunderbird Compose window for Email 1 (Timesheet)...")
         self._compose_and_dispatch(compose_arg)
-        logger.info("Email 1 (Timesheet HTML Report) sent successfully!")
+        logger.info("Email 1 (Timesheet HTML Report) dispatched.")
 
     def send_reply_with_details_excel(self, details_excel_path: Path) -> None:
         """
@@ -131,16 +140,17 @@ class ThunderbirdMailer:
         logger.info("Preparing Email 2 (Reply with Details.xlsx attached)...")
         reply_html = self._build_details_reply_html()
 
-        # FIX: Using OUTPUT_DIR instead of tempfile
         temp_reply_html = OUTPUT_DIR / "orangehrm_email2_reply.html"
         temp_reply_html.write_text(reply_html, encoding="utf-8")
 
         # Prepends 'Re:' to thread it visually in the recipient's inbox
-        reply_subject = f"Re: {EMAIL_1_SUBJECT}"
+        safe_team_lead_email = TEAM_LEAD_EMAIL.replace("'", "")
+        safe_subject = EMAIL_1_SUBJECT.replace("'", "")
+        reply_subject = f"Re: {safe_subject}"
         attachment_path = os.path.abspath(details_excel_path)
 
         compose_arg = (
-            f"to='{TEAM_LEAD_EMAIL}',"
+            f"to='{safe_team_lead_email}',"
             f"subject='{reply_subject}',"
             f"format='html',"
             f"message='{temp_reply_html.resolve()}',"
@@ -149,7 +159,7 @@ class ThunderbirdMailer:
 
         logger.info("Launching Thunderbird Compose window for Email 2 (Reply)...")
         self._compose_and_dispatch(compose_arg)
-        logger.info("Email 2 (Reply with Details.xlsx) sent successfully!")
+        logger.info("Email 2 (Reply with Details.xlsx) dispatched.")
 
     def _compose_and_dispatch(self, compose_arg: str) -> None:
         """
@@ -187,12 +197,27 @@ class ThunderbirdMailer:
                 env=clean_env,
             )
 
-            # 2. Allow Thunderbird time to render and focus the compose window.
-            time.sleep(5)
+            # 2. Wait for the compose window and focus it through its title.
+            active_title_locator = None
+            for title_locator in ("title:Write:", "title:Compose"):
+                try:
+                    self.desktop.wait_for_element(
+                        title_locator,
+                        timeout=self.timeout,
+                    )
+                    active_title_locator = title_locator
+                    break
+                except ValueError:
+                    continue
 
-            # 3. Dispatch using Universal Keyboard Shortcut (Ctrl + Enter)
-            logger.info("Dispatching email via Ctrl+Enter shortcut...")
-            self.desktop.press_keys("ctrl", "enter")
+            if active_title_locator is None:
+                raise ValueError("Thunderbird compose window was not found.")
+
+            self.desktop.click(active_title_locator)
+
+            # 3. Dispatch through the visible Send button.
+            logger.info("Dispatching email via the Thunderbird Send button...")
+            self.desktop.click("name:Send")
 
         except (OSError, RuntimeError, ValueError) as exc:
             raise EmailAutomationError(
@@ -251,7 +276,7 @@ class ThunderbirdMailer:
                 else:
                     cell_style = f"background-color:{bg_color}; color:#555555; text-align:center; padding:8px 10px; border:1px solid #CCCCCC;"
 
-                row_cells += f"<td style='{cell_style}'>{val_str}</td>"
+                row_cells += f"<td style='{cell_style}'>{html.escape(val_str)}</td>"
 
             rows_html += f"<tr>{row_cells}</tr>"
 
@@ -271,7 +296,7 @@ class ThunderbirdMailer:
             </table>
 
             <p>The exported workbook <strong>OrangeHRM_Data.xlsx</strong> is attached to this email. A follow-up reply containing the complete 10-section My Info Details workbook will follow shortly.</p>
-            <p style="margin-top: 20px;">Best regards,<br><strong>Abdul Rehman</strong><br><em>Enterprise RPA Automation Suite</em></p>
+            <p style="margin-top: 20px;">Best regards,<br><strong>{html.escape(AUTOMATION_AUTHOR)}</strong><br><em>Enterprise RPA Automation Suite</em></p>
         </body>
         </html>
         """
@@ -290,22 +315,19 @@ class ThunderbirdMailer:
             html = ThunderbirdMailer._build_details_reply_html()
         """
         sections = [
-            ("1. Personal Details", "Completed + PDF Hyperlink"),
-            ("2. Contact Details", "Completed + PDF Hyperlink"),
-            ("3. Emergency Contacts", "Completed + PDF Hyperlink"),
-            ("4. Dependents", "Completed + PDF Hyperlink"),
-            ("5. Immigration", "Completed + PDF Hyperlink"),
-            ("6. Job", "Completed + Attachments Block"),
-            ("7. Salary", "Completed + Attachments Block"),
-            ("8. Report-to", "Completed + Attachments Block"),
-            ("9. Qualifications", "Completed + PDF Hyperlink"),
-            ("10. Memberships", "Completed + PDF Hyperlink"),
+            (
+                format_my_info_section_label(section_name, position),
+                "Completed + Attachments Block"
+                if position in (6, 7, 8)
+                else "Completed + PDF Hyperlink",
+            )
+            for position, section_name in enumerate(MY_INFO_SECTIONS, start=1)
         ]
 
         rows_html = "".join(
             f"<tr>"
-            f"<td style='padding:7px 10px; border:1px solid #CCCCCC; font-weight:bold; color:#000000;'>{sec}</td>"
-            f"<td style='padding:7px 10px; border:1px solid #CCCCCC; color:#333333; background-color:#FAFAFA;'>{status}</td>"
+            f"<td style='padding:7px 10px; border:1px solid #CCCCCC; font-weight:bold; color:#000000;'>{html.escape(sec)}</td>"
+            f"<td style='padding:7px 10px; border:1px solid #CCCCCC; color:#333333; background-color:#FAFAFA;'>{html.escape(status)}</td>"
             f"</tr>"
             for sec, status in sections
         )
@@ -329,7 +351,7 @@ class ThunderbirdMailer:
                 </tbody>
             </table>
 
-            <p>Best regards,<br><strong>Abdul Rehman</strong><br><em>Enterprise RPA Automation Suite</em></p>
+            <p>Best regards,<br><strong>{html.escape(AUTOMATION_AUTHOR)}</strong><br><em>Enterprise RPA Automation Suite</em></p>
         </body>
         </html>
         """
